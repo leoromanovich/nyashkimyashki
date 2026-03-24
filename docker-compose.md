@@ -141,3 +141,49 @@ services:
         max-file: "5"
 
 ```
+
+
+
+
+  Фаза 1: Стабильный запуск с FP8
+
+  python -m sglang.launch_server \
+    --model-path <path-to-glm5> \
+    --tp 8 \
+    --attention-backend nsa \
+    --page-size 64 \
+    --kv-cache-dtype fp8_e4m3 \
+    --mem-fraction-static 0.85 \
+    --chunked-prefill-size 4096 \
+    --cuda-graph-max-bs 64 \
+    --enable-hierarchical-cache \
+    --hicache-size 400 \
+    --hicache-write-policy write_through \
+    --hicache-io-backend kernel \
+    --max-running-requests 48
+
+
+
+
+Что НЕ указываем (и почему):
+  - --nsa-prefill-backend / --nsa-decode-backend — не указываем явно. При fp8_e4m3 автодетект сам выберет flashmla_auto / flashmla_kv для Hopper. Явное указание может конфликтовать с
+  будущими оптимизациями
+  - --context-length — оставляем 200k по умолчанию. FP8 даёт достаточно GPU KV для одного полного контекста
+
+  Фаза 2: Если OOM — пошаговая эскалация
+
+  Шаг 1: --cuda-graph-max-bs 32          # ещё меньше графов
+  Шаг 2: --mem-fraction-static 0.82      # больше headroom
+  Шаг 3: --disable-cuda-graph            # убираем графы совсем
+  Шаг 4: --chunked-prefill-size 2048     # минимальные activations
+
+  Фаза 3: После стабильного запуска — тюнинг производительности
+
+  # Постепенно увеличиваем:
+  --cuda-graph-max-bs 128    # больше графов → лучше decode latency
+  --mem-fraction-static 0.87 # больше KV cache
+  --chunked-prefill-size 8192 # быстрее prefill
+
+  Что даёт FP8 в конкретных цифрах для вашего сетапа
+
+  При mem_fraction_static=0.85, ~24 GB/GPU на KV:
