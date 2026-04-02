@@ -1,6 +1,12 @@
 kimi-k2.5
 
 
+volumes
+- huggingface_cache:/root/.cache/huggingface
+
+
+
+
 Вероятные причины в твоём случае
 
   1. Online FP8 quantization — при создании scale-тензоров для MoE они могут оказаться на CPU. Это баг, фикс (PR #38456) был написан, но не вмержен.
