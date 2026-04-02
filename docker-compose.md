@@ -1,6 +1,78 @@
 kimi-k2.5
 
-```docker
+```
+version: "3.9"
+
+  services:
+    vllm-kimi-k25:
+      image: vllm/vllm-openai:v0.18.1-aarch64-cu130
+      container_name: vllm-kimi-k25
+      restart: unless-stopped
+
+      network_mode: host
+      ipc: host
+      privileged: true
+      shm_size: "32gb"
+
+      environment:
+        VLLM_USE_FLASHINFER_MOE_FP4: "1"
+        CUDA_DEVICE_MAX_CONNECTIONS: "1"
+        NCCL_DEBUG: "WARN"
+        NCCL_IB_DISABLE: "0"
+        NCCL_P2P_DISABLE: "0"
+        TORCH_NCCL_AVOID_RECORD_STREAMS: "1"
+
+      volumes:
+        - /home/models/Kimi-K2.5-NVFP4:/models/Kimi-K2.5-NVFP4:ro
+        - ./vllm-cache:/root/.cache/vllm
+
+      ulimits:
+        memlock: -1
+        stack: 67108864
+
+      command: >
+        vllm serve /models/Kimi-K2.5-NVFP4
+        --trust-remote-code
+        --tensor-parallel-size 4
+        --data-parallel-size 2
+        --enable-expert-parallel
+        --enable-ep-weight-filter
+        --mm-encoder-tp-mode data
+        --compilation_config.pass_config.fuse_allreduce_rms true
+        --max-model-len 131072
+        --gpu-memory-utilization 0.95
+        --enable-chunked-prefill
+        --max-num-batched-tokens 32768
+        --max-num-seqs 8
+        --enable-prefix-caching
+        --kv-cache-dtype fp8_e5m2
+        --kv-offloading-size 512
+        --kv-offloading-backend native
+        --tool-call-parser kimi_k2
+        --reasoning-parser kimi_k2
+        --enable-auto-tool-choice
+        --served-model-name kimi-k2.5
+        --port 8000
+
+      healthcheck:
+        test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
+        interval: 30s
+        timeout: 10s
+        retries: 10
+        start_period: 300s
+
+      logging:
+        driver: json-file
+        options:
+          max-size: "100m"
+          max-file: "5"
+
+
+```
+
+
+
+```
 export VLLM_USE_FLASHINFER_MOE_FP4=1
 
 vllm serve moonshotai/Kimi-K2.5-NVFP4 \
