@@ -1,3 +1,32 @@
+kimi-k2.5
+
+```bash
+  export VLLM_USE_FLASHINFER_MOE_FP4=1
+
+  vllm serve moonshotai/Kimi-K2.5-NVFP4 \
+    --trust-remote-code \
+    --tensor-parallel-size 4 \
+    --data-parallel-size 2 \
+    --enable-expert-parallel \
+    --enable-ep-weight-filter \
+    --mm-encoder-tp-mode data \
+    --compilation_config.pass_config.fuse_allreduce_rms true \
+    --max-model-len 131072 \
+    --gpu-memory-utilization 0.95 \
+    --enable-chunked-prefill \
+    --max-num-batched-tokens 32768 \
+    --max-num-seqs 8 \
+    --enable-prefix-caching \
+    --kv-cache-dtype fp8_e5m2 \
+    --tool-call-parser kimi_k2 \
+    --reasoning-parser kimi_k2 \
+    --enable-auto-tool-choice \
+    --served-model-name kimi-k2.5
+
+```
+
+
+
 
 
 Как можно заранить компоуз с glm-5
