@@ -45,7 +45,7 @@ version: "3.9"
         --max-num-batched-tokens 32768
         --max-num-seqs 8
         --enable-prefix-caching
-        --kv-cache-dtype fp8_e5m2
+        --kv-cache-dtype fp8_e4m3
         --kv-offloading-size 512
         --kv-offloading-backend native
         --tool-call-parser kimi_k2
