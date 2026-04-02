@@ -1,5 +1,34 @@
 kimi-k2.5
 
+
+Вероятные причины в твоём случае
+
+  1. Online FP8 quantization — при создании scale-тензоров для MoE они могут оказаться на CPU. Это баг, фикс (PR #38456) был написан, но не вмержен.
+  2. NVFP4 + EP + compilation — комбинация expert parallel с CUDA graphs при прогреве может спровоцировать то же самое.
+
+  Что попробовать (по порядку)
+
+  1. Отключить CUDA graphs на прогреве:
+  --compilation_config.cudagraph_mode none
+  Если с этим работает — проблема в CUDA graph capture. Можно вернуть piecewise после подтверждения.
+
+  2. Включить eager mode:
+  --enforce-eager
+  Полностью отключает torch.compile и CUDA graphs. Потеря ~5-15% throughput, но стабильно. Хороший способ убедиться, что модель вообще работает.
+
+  3. Обновить версию. Ты на main, но docker image v0.17.0. Баг актуален для v0.17-v0.18. Попробуй:
+  vllm/vllm-openai:latest
+  или nightly.
+
+  4. Явно указать moe backend:
+  --override-neuron-config moe_backend=cutlass
+  или через env:
+  VLLM_MOE_BACKEND=cutlass
+
+  Рекомендуемый путь
+
+  Сначала запусти с --enforce-eager чтобы убедиться, что модель загружается и инферит. Потом убирай его и смотри, на каком этапе компиляции падает.
+
 ```
 version: "3.9"
 
