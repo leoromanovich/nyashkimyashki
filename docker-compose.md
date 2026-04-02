@@ -5,7 +5,7 @@ version: "3.9"
 
   services:
     vllm-kimi-k25:
-      image: vllm/vllm-openai:v0.18.1-aarch64-cu130
+      image: vllm/vllm-openai:v0.18.1-cu130
       container_name: vllm-kimi-k25
       restart: unless-stopped
 
