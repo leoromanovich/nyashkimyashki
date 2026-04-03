@@ -1,0 +1,94 @@
+"""
+  title: Concurrent Request Limiter
+  author: assistant
+  version: 0.1.0
+  license: MIT
+  description: Limits the number of concurrent requests per user per model.
+  """
+
+  import time
+  import threading
+  from pydantic import BaseModel, Field
+
+
+  class Valves(BaseModel):
+      max_concurrent_requests: int = Field(
+          default=3,
+          description="Maximum number of concurrent requests per user per model",
+      )
+      request_timeout: int = Field(
+          default=300,
+          description="Seconds after which a request slot is automatically freed (safety net)",
+      )
+
+
+  class Filter:
+      def __init__(self):
+          self.valves = Valves()
+          # {(user_id, model_id): {request_key: timestamp}}
+          self._active: dict[tuple[str, str], dict[str, float]] = {}
+          self._lock = threading.Lock()
+
+      def _cleanup_expired(self, key: tuple[str, str]):
+          """Remove stale request slots that exceeded the timeout."""
+          now = time.time()
+          timeout = self.valves.request_timeout
+          if key in self._active:
+              expired = [
+                  k for k, ts in self._active[key].items()
+                  if now - ts > timeout
+              ]
+              for k in expired:
+                  del self._active[key][k]
+              if not self._active[key]:
+                  del self._active[key]
+
+      def _make_request_key(self, body: dict, user_id: str) -> str:
+          """Create a unique key for this request."""
+          chat_id = body.get("metadata", {}).get("chat_id", "")
+          message_id = body.get("metadata", {}).get("message_id", "")
+          return f"{user_id}:{chat_id}:{message_id}:{time.time_ns()}"
+
+      def inlet(self, body: dict, __user__: dict = None) -> dict:
+          if not __user__:
+              return body
+
+          user_id = __user__.get("id", "unknown")
+          model_id = body.get("model", "unknown")
+          key = (user_id, model_id)
+
+          with self._lock:
+              self._cleanup_expired(key)
+              active_count = len(self._active.get(key, {}))
+
+              if active_count >= self.valves.max_concurrent_requests:
+                  raise Exception(
+                      f"Too many concurrent requests ({active_count}/{self.valves.max_concurrent_requests}). "
+                      f"Please wait for your current requests to complete."
+                  )
+
+              request_key = self._make_request_key(body, user_id)
+              self._active.setdefault(key, {})[request_key] = time.time()
+
+          # Store request_key in metadata so outlet can find it
+          body.setdefault("metadata", {})["_ratelimit_request_key"] = request_key
+          body["metadata"]["_ratelimit_user_model_key"] = f"{user_id}||{model_id}"
+
+          return body
+
+      def outlet(self, body: dict, __user__: dict = None) -> dict:
+          metadata = body.get("metadata", {})
+          request_key = metadata.get("_ratelimit_request_key")
+          um_key_str = metadata.get("_ratelimit_user_model_key")
+
+          if request_key and um_key_str:
+              parts = um_key_str.split("||", 1)
+              if len(parts) == 2:
+                  key = (parts[0], parts[1])
+                  with self._lock:
+                      if key in self._active:
+                          self._active[key].pop(request_key, None)
+                          if not self._active[key]:
+                              del self._active[key]
+
+          return body
