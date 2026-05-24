@@ -1,0 +1,152 @@
+Ниже порядок, в котором я бы запускал. Цель: сначала менять по одному измерению, не смешивать сразу NVFP4+DPA+Spec+HiCache.
+
+**0. Проверка контейнера**
+Внутри текущего image проверь, что SGLang знает нужные флаги:
+
+```bash
+python3 -m sglang.launch_server --help | grep -E "modelopt_fp4|enable-dp-attention|dsa|fp4-gemm"
+```
+
+Если `modelopt_fp4`/`dsa` нет, для NVFP4 лучше сразу брать свежий `lmsysorg/sglang:dev-cu13` или актуальный NGC SGLang.
+
+**1. Текущий FP8 + DPA**
+Для текущего FP8 контейнера меняешь только DPA-часть:
+
+```bash
+--tp 8
+--dp 8
+--enable-dp-attention
+--load-balance-method total_tokens
+--chunked-prefill-size 32768
+--schedule-conservativeness 3.3333333333
+```
+
+Почему так:
+
+```text
+chunked_prefill_size / dp = 32768 / 8 = 4096 effective
+schedule_conservativeness * 0.3 = 3.3333 * 0.3 ~= 1.0 effective
+```
+
+Остальные FP8 флаги пока не трогай.
+
+**2. Минимальный NVFP4 запуск**
+Сначала без DPA, без speculative, без HiCache:
+
+```bash
+python3 -m sglang.launch_server \
+  --model-path nvidia/GLM-5.1-NVFP4 \
+  --served-model-name GLM-5.1 \
+  --trust-remote-code \
+  --tp 8 \
+  --quantization modelopt_fp4 \
+  --tool-call-parser glm47 \
+  --reasoning-parser glm45 \
+  --mem-fraction-static 0.80 \
+  --host 0.0.0.0 \
+  --port 30000
+```
+
+Проверка:
+
+```bash
+curl -s http://127.0.0.1:30000/health
+curl -s http://127.0.0.1:30000/v1/models
+```
+
+**3. NVFP4 с явными backend’ами**
+Если минимальный запуск грузится, фиксируем backend’ы явно:
+
+```bash
+python3 -m sglang.launch_server \
+  --model-path nvidia/GLM-5.1-NVFP4 \
+  --served-model-name GLM-5.1 \
+  --trust-remote-code \
+  --tp 8 \
+  --quantization modelopt_fp4 \
+  --attention-backend dsa \
+  --dsa-prefill-backend trtllm \
+  --dsa-decode-backend trtllm \
+  --kv-cache-dtype fp8_e4m3 \
+  --page-size 64 \
+  --moe-runner-backend flashinfer_trtllm \
+  --fp4-gemm-backend auto \
+  --tool-call-parser glm47 \
+  --reasoning-parser glm45 \
+  --context-length 202752 \
+  --mem-fraction-static 0.80 \
+  --enable-metrics \
+  --host 0.0.0.0 \
+  --port 30000
+```
+
+Не ставь пока `kv-cache-dtype fp4_e2m1`: для DSA/GLM безопасный первый режим это `fp8_e4m3`.
+
+**4. Добавить speculative**
+Для GLM/DeepSeek MTP draft path обычно не нужен:
+
+```bash
+export SGLANG_ENABLE_SPEC_V2=1
+
+# добавить к команде:
+--speculative-algorithm EAGLE \
+--speculative-num-steps 3 \
+--speculative-eagle-topk 1 \
+--speculative-num-draft-tokens 4
+```
+
+Если `topk > 1`, Spec v2 ломается/отключается. Оставляем `topk 1`.
+
+**5. Добавить HiCache**
+После стабильной speculative-версии:
+
+```bash
+--enable-hierarchical-cache \
+--hicache-size 200 \
+--hicache-io-backend kernel \
+--hicache-mem-layout page_first \
+--hicache-write-policy write_through_selective \
+--hicache-storage-prefetch-policy timeout
+```
+
+`--hicache-size 200` это примерно **200 GB на rank/GPU**, то есть около `1.6 TB` host RAM на 8 GPU.
+
+**6. Добавить DPA уже к NVFP4**
+Когда NVFP4+Spec+HiCache стабилен:
+
+```bash
+--dp 8 \
+--enable-dp-attention \
+--load-balance-method total_tokens \
+--chunked-prefill-size 32768 \
+--schedule-conservativeness 3.3333333333 \
+--cuda-graph-max-bs 16 \
+--max-running-requests 16
+```
+
+`max-running-requests 16` в DPA считай как per-DP-rank стартовую настройку. Поднимать после проверки `retracted_reqs`, KV usage и p95 TTFT.
+
+**7. Опционально IndexCache**
+Только после стабильности:
+
+```bash
+--json-model-override-args '{"index_topk_pattern":"FFSFSSSFSSFFFSSSFFFSFSSSSSSFFSFFSFFSSFFFFFFSFFFFFSFFSSSSSSFSFFFSFSSSFSFFSFFSSS"}'
+```
+
+Это ускоряющая эвристика с малой потерей accuracy; не включай в baseline accuracy-прогон.
+
+**Что мониторить после каждого этапа**
+
+```text
+/health
+/v1/models
+retracted_reqs
+new_token_ratio
+KV cache usage per rank
+cache hit rate
+TTFT p50/p95/p99
+tokens/s decode
+avg_spec_accept_length
+```
+
+Если минимальный NVFP4 не стартует, не добавляй следующие флаги: сначала чинить image/FlashInfer/ModelOpt support.
