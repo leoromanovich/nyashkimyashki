@@ -150,3 +150,69 @@ avg_spec_accept_length
 ```
 
 Если минимальный NVFP4 не стартует, не добавляй следующие флаги: сначала чинить image/FlashInfer/ModelOpt support.
+
+
+
+export OMP_NUM_THREADS=16
+export SGLANG_ENABLE_SPEC_V2=1
+
+python -m sglang.launch_server \
+  --model-path nvidia/GLM-5.1-NVFP4 \
+  --served-model-name GLM-5.1-NVFP4 \
+  --tensor-parallel-size 8 \
+  --trust-remote-code \
+  --quantization modelopt_fp4 \
+  \
+  --attention-backend dsa \
+  --dsa-prefill-backend trtllm \
+  --dsa-decode-backend trtllm \
+  \
+  --kv-cache-dtype fp8_e4m3 \
+  --page-size 64 \
+  --context-length 202752 \
+  \
+  --fp4-gemm-backend flashinfer_cutlass \
+  --moe-runner-backend flashinfer_trtllm \
+  --disable-shared-experts-fusion \
+  \
+  --reasoning-parser glm45 \
+  --tool-call-parser glm47 \
+  --json-model-override-args '{"index_topk_pattern":"FFSFSSSFSSFFFSSSFFFSFSSSSSSFFSFFSFFSSFFFFFFSFFFFFSFFSSSSSSFSFFFSFSSSFSFFSFFSSS"}' \
+  \
+  --chunked-prefill-size 4096 \
+  --schedule-conservativeness 0.3 \
+  --cuda-graph-max-bs 64 \
+  --max-running-requests 48 \
+  --mem-fraction-static 0.85 \
+  \
+  --enable-hierarchical-cache \
+  --hicache-size 200 \
+  --hicache-io-backend kernel \
+  --hicache-mem-layout page_first \
+  --hicache-write-policy write_through_selective \
+  --hicache-storage-prefetch-policy timeout \
+  \
+  --speculative-algorithm EAGLE \
+  --speculative-num-steps 3 \
+  --speculative-eagle-topk 1 \
+  --speculative-num-draft-tokens 4 \
+  \
+  --enable-metrics \
+  --enable-custom-logit-processor \
+  --host 0.0.0.0 \
+  --port 8000
+
+
+
+uvx llama-benchy \
+  --base-url http://127.0.0.1:30000/v1 \
+  --model glm \
+  --tokenizer zai-org/GLM-5.1 \
+  --pp 2048 \
+  --tg 512 \
+  --depth 0 8192 32768 65536 131072 \
+  --concurrency 1 4 8 16 24 \
+  --runs 2 \
+  --latency-mode generation \
+  --enable-prefix-caching \
+  --skip-coherence
