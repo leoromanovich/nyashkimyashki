@@ -1,3 +1,6 @@
+docker logs <container> 2>&1 | grep -Ei "CUDA|out of memory|illegal|assert|traceback|killed|abort|connection closed"
+
+
 Ниже порядок, в котором я бы запускал. Цель: сначала менять по одному измерению, не смешивать сразу NVFP4+DPA+Spec+HiCache.
 
 **0. Проверка контейнера**
