@@ -1,3 +1,6 @@
+curl -sS http://HOST:PORT/server_info | jq '.internal_states[] | {dp_rank, effective_max_running_requests_per_dp}'
+curl -sS 'http://HOST:PORT/v1/loads?include=all' | jq '.loads[] | {dp_rank,num_running_reqs,num_waiting_reqs,token_usage,max_running_requests,num_total_tokens}'
+
 docker logs <container> 2>&1 | grep -Ei "CUDA|out of memory|illegal|assert|traceback|killed|abort|connection closed"
 
 
