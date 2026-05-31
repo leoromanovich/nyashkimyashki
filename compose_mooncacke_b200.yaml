@@ -275,3 +275,462 @@ sglang-1  | I0531 15:47:22.933233  1373 transfer_engine_impl.cpp:757] Metrics re
 sglang-1  | I0531 15:47:22.933243  1373 transfer_engine_impl.cpp:107] Transfer Engine parseHostNameWithPort. server_name: sglang port: 12767
 sglang-1  | I0531 15:47:22.933274  1375 tcp_transport.cpp:541] TcpTransport: listen on port 16875
 sglang-1  | I0531 15:47:22.933431  1373 transfer_metadata_plugin.cpp:1219] Found active interface eth0 with IP 172.17.1.3
+
+
+
+sglang-1  | [2026-05-31 15:59:13] INFO:     192.168.217.86:56530 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+sglang-1  | [2026-05-31 15:59:14 DP7 TP7] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 0, token usage: 0.24, #running-req: 4, #queue-req: 0, #pending-token: 28664, cuda graph: False, input throughput (token/s): 10878.89
+sglang-1  | [2026-05-31 15:59:14 DP2 TP2] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 11712, token usage: 0.24, #running-req: 7, #queue-req: 0, #pending-token: 18916, cuda graph: False, input throughput (token/s): 11041.90
+sglang-1  | [2026-05-31 15:59:14 DP2 TP2] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 0, token usage: 0.24, #running-req: 7, #queue-req: 0, #pending-token: 10724, cuda graph: False, input throughput (token/s): 10111.94
+sglang-1  | [2026-05-31 15:59:15 DP7 TP7] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 0, token usage: 0.25, #running-req: 4, #queue-req: 0, #pending-token: 20472, cuda graph: False, input throughput (token/s): 7776.44
+sglang-1  | [2026-05-31 15:59:15 DP2 TP2] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 0, token usage: 0.25, #running-req: 7, #queue-req: 0, #pending-token: 2532, cuda graph: False, input throughput (token/s): 9839.57
+sglang-1  | [2026-05-31 15:59:15 DP7 TP7] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 0, token usage: 0.25, #running-req: 4, #queue-req: 0, #pending-token: 12280, cuda graph: False, input throughput (token/s): 10071.31
+sglang-1  | [2026-05-31 15:59:16 DP2 TP2] Prefill batch, #new-seq: 1, #new-token: 2560, #cached-token: 0, token usage: 0.25, #running-req: 7, #queue-req: 0, #pending-token: 0, cuda graph: False, input throughput (token/s): 7027.27
+sglang-1  | [2026-05-31 15:59:16] INFO:     192.168.217.86:56384 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+sglang-1  | [2026-05-31 15:59:16 DP7 TP7] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 0, token usage: 0.26, #running-req: 4, #queue-req: 0, #pending-token: 4088, cuda graph: False, input throughput (token/s): 27268.96
+sglang-1  | [2026-05-31 15:59:16 DP7 TP7] Prefill batch, #new-seq: 1, #new-token: 4096, #cached-token: 0, token usage: 0.26, #running-req: 4, #queue-req: 0, #pending-token: 0, cuda graph: False, input throughput (token/s): 28287.16
+sglang-1  | [2026-05-31 15:59:16] INFO:     192.168.217.86:56202 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+sglang-1  | [2026-05-31 15:59:16 DP0 TP0] Decode batch, #running-req: 8, #token: 252160, token usage: 0.19, accept len: 2.85, accept rate: 0.62, cuda graph: True, gen throughput (token/s): 81.64, #queue-req: 0
+sglang-1  | [2026-05-31 15:59:16 DP2 TP2] Decode batch, #running-req: 8, #token: 335488, token usage: 0.25, accept len: 2.80, accept rate: 0.60, cuda graph: True, gen throughput (token/s): 67.19, #queue-req: 0
+sglang-1  | [2026-05-31 15:59:16 DP1 TP1] Decode batch, #running-req: 5, #token: 258304, token usage: 0.19, accept len: 3.21, accept rate: 0.74, cuda graph: True, gen throughput (token/s): 73.98, #queue-req: 0
+sglang-1  | I0531 15:59:16.997754  5927 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026750.bucket
+sglang-1  | I0531 15:59:16.998212  5927 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026725.bucket
+sglang-1  | E0531 15:59:17.002642  7958 transfer_metadata_plugin.cpp:290] GET http://mooncake_master:8080/metadata?key=mooncake%2Fram%2F172.17.1.3%3A15121 http=404 body: metadata not found
+sglang-1  | W0531 15:59:17.002660  7958 transfer_metadata.cpp:880] Failed to retrieve segment descriptor, name 172.17.1.3:15121
+sglang-1  | E0531 15:59:17.002664  7958 transfer_task.cpp:562] Failed to open segment 172.17.1.3:15121
+sglang-1  | E0531 15:59:17.002665  7958 client_service.cpp:2282] Failed to submit transfer operation
+sglang-1  | I0531 15:59:17.002667  7958 real_client.cpp:4239] Time taken for batch_get_into_offload_object_internal: 5ms, with target_rpc_service_addr: sglang:42773, key size: 10, batch_id: 148, gc ttl: 5000ms.
+sglang-1  | E0531 15:59:17.002764  7958 real_client.cpp:4252] Batch get into offload object failed with error: TRANSFER_FAIL
+sglang-1  | E0531 15:59:17.002768  7958 real_client.cpp:3538] Batch get store object failed with error: TRANSFER_FAIL
+sglang-1  | I0531 15:59:17.003253  6779 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026825.bucket
+sglang-1  | I0531 15:59:17.011386  6779 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026826.bucket
+sglang-1  | I0531 15:59:17.013592  6779 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026827.bucket
+sglang-1  | I0531 15:59:17.015175  6779 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026824.bucket
+sglang-1  | I0531 15:59:17.017494  6779 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026830.bucket
+sglang-1  | I0531 15:59:17.018780  6779 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026790.bucket
+sglang-1  | I0531 15:59:17.020505  6779 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026829.bucket
+sglang-1  | I0531 15:59:17.020917  6779 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026789.bucket
+sglang-1  | E0531 15:59:17.024056  7958 transfer_metadata_plugin.cpp:290] GET http://mooncake_master:8080/metadata?key=mooncake%2Fram%2F172.17.1.3%3A16769 http=404 body: metadata not found
+sglang-1  | W0531 15:59:17.024070  7958 transfer_metadata.cpp:880] Failed to retrieve segment descriptor, name 172.17.1.3:16769
+sglang-1  | E0531 15:59:17.024072  7958 transfer_task.cpp:562] Failed to open segment 172.17.1.3:16769
+sglang-1  | E0531 15:59:17.024075  7958 client_service.cpp:2282] Failed to submit transfer operation
+sglang-1  | I0531 15:59:17.024076  7958 real_client.cpp:4239] Time taken for batch_get_into_offload_object_internal: 21ms, with target_rpc_service_addr: sglang:34487, key size: 41, batch_id: 213, gc ttl: 5000ms.
+sglang-1  | E0531 15:59:17.024283  7958 real_client.cpp:4252] Batch get into offload object failed with error: TRANSFER_FAIL
+sglang-1  | E0531 15:59:17.024288  7958 real_client.cpp:3538] Batch get store object failed with error: TRANSFER_FAIL
+sglang-1  | I0531 15:59:17.024296  7958 real_client.cpp:3556] Time taken for batch_get_into: 190865us, read store: 26923us, with memory key count: 528, offload key count: 51
+sglang-1  | I0531 15:59:17.147154  5927 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026750.bucket
+sglang-1  | I0531 15:59:17.148169  5927 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026724.bucket
+sglang-1  | I0531 15:59:17.148682  5927 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026725.bucket
+sglang-1  | E0531 15:59:17.152587  7958 transfer_metadata_plugin.cpp:290] GET http://mooncake_master:8080/metadata?key=mooncake%2Fram%2F172.17.1.3%3A15121 http=404 body: metadata not found
+sglang-1  | W0531 15:59:17.152606  7958 transfer_metadata.cpp:880] Failed to retrieve segment descriptor, name 172.17.1.3:15121
+sglang-1  | E0531 15:59:17.152608  7958 transfer_task.cpp:562] Failed to open segment 172.17.1.3:15121
+sglang-1  | E0531 15:59:17.152617  7958 client_service.cpp:2282] Failed to submit transfer operation
+sglang-1  | I0531 15:59:17.152619  7958 real_client.cpp:4239] Time taken for batch_get_into_offload_object_internal: 5ms, with target_rpc_service_addr: sglang:42773, key size: 9, batch_id: 149, gc ttl: 5000ms.
+sglang-1  | E0531 15:59:17.152998  7958 real_client.cpp:4252] Batch get into offload object failed with error: TRANSFER_FAIL
+sglang-1  | E0531 15:59:17.153016  7958 real_client.cpp:3538] Batch get store object failed with error: TRANSFER_FAIL
+sglang-1  | I0531 15:59:17.153302  6779 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026789.bucket
+sglang-1  | I0531 15:59:17.157239  6779 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026788.bucket
+sglang-1  | E0531 15:59:17.159618  7958 transfer_metadata_plugin.cpp:290] GET http://mooncake_master:8080/metadata?key=mooncake%2Fram%2F172.17.1.3%3A16769 http=404 body: metadata not found
+sglang-1  | W0531 15:59:17.159634  7958 transfer_metadata.cpp:880] Failed to retrieve segment descriptor, name 172.17.1.3:16769
+sglang-1  | E0531 15:59:17.159637  7958 transfer_task.cpp:562] Failed to open segment 172.17.1.3:16769
+sglang-1  | E0531 15:59:17.159638  7958 client_service.cpp:2282] Failed to submit transfer operation
+sglang-1  | I0531 15:59:17.159641  7958 real_client.cpp:4239] Time taken for batch_get_into_offload_object_internal: 6ms, with target_rpc_service_addr: sglang:34487, key size: 8, batch_id: 214, gc ttl: 5000ms.
+sglang-1  | E0531 15:59:17.160091  7958 real_client.cpp:4252] Batch get into offload object failed with error: TRANSFER_FAIL
+sglang-1  | E0531 15:59:17.160109  7958 real_client.cpp:3538] Batch get store object failed with error: TRANSFER_FAIL
+sglang-1  | I0531 15:59:17.160115  7958 real_client.cpp:3556] Time taken for batch_get_into: 133252us, read store: 13158us, with memory key count: 111, offload key count: 17
+sglang-1  | [2026-05-31 15:59:17 DP0 TP0] Prefetch operation 87e621453799427892403453418853c0 failed to retrieve page ed673114864048f549729d4157930d53b09c34ce6c29ee822fe90e1b5388d301.
+sglang-1  | [2026-05-31 15:59:17 DP1 TP1] Prefill batch, #new-seq: 1, #new-token: 768, #cached-token: 9728, token usage: 0.19, #running-req: 5, #queue-req: 1, #pending-token: 0, cuda graph: False, input throughput (token/s): 60.94
+sglang-1  | [2026-05-31 15:59:17] INFO:     192.168.217.86:56308 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+
+
+
+
+sglang-1  | [2026-05-31 15:39:13 DP4 TP4] Decode batch, #running-req: 7, #token: 366400, token usage: 0.27, accept len: 2.85, accept rate: 0.62, cuda graph: True, gen throughput (token/s): 61.68, #queue-req: 0
+sglang-1  | [2026-05-31 15:39:13 DP6 TP6] Decode batch, #running-req: 10, #token: 347904, token usage: 0.26, accept len: 3.21, accept rate: 0.74, cuda graph: True, gen throughput (token/s): 143.41, #queue-req: 0
+sglang-1  | [2026-05-31 15:39:13 DP3 TP3] Decode batch, #running-req: 10, #token: 279744, token usage: 0.21, accept len: 3.58, accept rate: 0.86, cuda graph: True, gen throughput (token/s): 148.86, #queue-req: 0
+sglang-1  | [2026-05-31 15:39:14 DP5 TP5] Decode batch, #running-req: 4, #token: 347328, token usage: 0.26, accept len: 2.79, accept rate: 0.60, cuda graph: True, gen throughput (token/s): 46.54, #queue-req: 0
+sglang-1  | [2026-05-31 15:39:14 DP0 TP0] Decode batch, #running-req: 3, #token: 292416, token usage: 0.21, accept len: 2.69, accept rate: 0.56, cuda graph: True, gen throughput (token/s): 44.46, #queue-req: 0
+sglang-1  | [2026-05-31 15:39:14] INFO:     127.0.0.1:33384 - "GET /health HTTP/1.1" 200 OK
+sglang-1  | I0531 15:39:14.189616  7951 real_client.cpp:3556] Time taken for batch_get_into: 34647us, read store: 0us, with memory key count: 125, offload key count: 0
+sglang-1  | I0531 15:39:14.351312  7951 real_client.cpp:3556] Time taken for batch_get_into: 160175us, read store: 0us, with memory key count: 125, offload key count: 0
+sglang-1  | I0531 15:39:14.672492  7951 real_client.cpp:3556] Time taken for batch_get_into: 64081us, read store: 0us, with memory key count: 17, offload key count: 0
+sglang-1  | [2026-05-31 15:39:14 DP3 TP3] Prefill batch, #new-seq: 1, #new-token: 384, #cached-token: 17728, token usage: 0.18, #running-req: 8, #queue-req: 1, #pending-token: 0, cuda graph: False, input throughput (token/s): 36.42
+sglang-1  | [2026-05-31 15:39:14] INFO:     192.168.217.86:46552 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+sglang-1  | I0531 15:39:14.819396  7951 real_client.cpp:3556] Time taken for batch_get_into: 146186us, read store: 0us, with memory key count: 17, offload key count: 0
+sglang-1  | I0531 15:39:15.158957  7951 real_client.cpp:3556] Time taken for batch_get_into: 28508us, read store: 0us, with memory key count: 6, offload key count: 0
+sglang-1  | I0531 15:39:15.264094  7951 real_client.cpp:3556] Time taken for batch_get_into: 103226us, read store: 0us, with memory key count: 6, offload key count: 0
+sglang-1  | [2026-05-31 15:39:15 DP0 TP0] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 10496, token usage: 0.23, #running-req: 3, #queue-req: 0, #pending-token: 24611, cuda graph: False, input throughput (token/s): 39.27
+sglang-1  | [2026-05-31 15:39:16 DP3 TP3] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 10816, token usage: 0.17, #running-req: 9, #queue-req: 0, #pending-token: 15048, cuda graph: False, input throughput (token/s): 5540.89
+sglang-1  | [2026-05-31 15:39:16 DP0 TP0] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 0, token usage: 0.23, #running-req: 3, #queue-req: 0, #pending-token: 16419, cuda graph: False, input throughput (token/s): 12690.60
+sglang-1  | [2026-05-31 15:39:16 DP3 TP3] Prefill batch, #new-seq: 2, #new-token: 5056, #cached-token: 10112, token usage: 0.17, #running-req: 9, #queue-req: 0, #pending-token: 0, cuda graph: False, input throughput (token/s): 13198.13
+sglang-1  | [2026-05-31 15:39:16] INFO:     192.168.217.86:46580 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+sglang-1  | [2026-05-31 15:39:16] INFO:     192.168.217.86:48044 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+sglang-1  | [2026-05-31 15:39:17 DP0 TP0] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 0, token usage: 0.24, #running-req: 3, #queue-req: 0, #pending-token: 8227, cuda graph: False, input throughput (token/s): 12907.17
+sglang-1  | [2026-05-31 15:39:17 DP0 TP0] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 0, token usage: 0.24, #running-req: 3, #queue-req: 0, #pending-token: 35, cuda graph: False, input throughput (token/s): 46506.57
+sglang-1  | [2026-05-31 15:39:17 DP0 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 0, token usage: 0.24, #running-req: 3, #queue-req: 0, #pending-token: 0, cuda graph: False, input throughput (token/s): 2449.64
+sglang-1  | [2026-05-31 15:39:17] INFO:     192.168.217.86:48070 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+sglang-1  | I0531 15:39:17.446187  7951 real_client.cpp:3556] Time taken for batch_get_into: 3576us, read store: 0us, with memory key count: 7, offload key count: 0
+sglang-1  | I0531 15:39:17.456015  7951 real_client.cpp:3556] Time taken for batch_get_into: 9587us, read store: 0us, with memory key count: 7, offload key count: 0
+sglang-1  | [2026-05-31 15:39:17 DP1 TP1] Decode batch, #running-req: 3, #token: 342976, token usage: 0.25, accept len: 3.30, accept rate: 0.77, cuda graph: True, gen throughput (token/s): 31.49, #queue-req: 0
+sglang-1  | [2026-05-31 15:39:17 DP7 TP7] Decode batch, #running-req: 3, #token: 196928, token usage: 0.14, accept len: 3.23, accept rate: 0.74, cuda graph: True, gen throughput (token/s): 40.08, #queue-req: 0
+sglang-1  | [2026-05-31 15:39:18 DP3 TP3] Prefill batch, #new-seq: 1, #new-token: 8064, #cached-token: 10176, token usage: 0.17, #running-req: 10, #queue-req: 0, #pending-token: 0, cuda graph: False, input throughput (token/s): 5796.47
+sglang-1  | [2026-05-31 15:39:18] INFO:     192.168.217.86:39866 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+sglang-1  | [2026-05-31 15:39:18 DP2 TP2] Decode batch, #running-req: 9, #token: 454528, token usage: 0.33, accept len: 3.22, accept rate: 0.74, cuda graph: True, gen throughput (token/s): 81.13, #queue-req: 0
+sglang-1  | [2026-05-31 15:39:18 DP7 TP7] Prefill batch, #new-seq: 1, #new-token: 3008, #cached-token: 9984, token usage: 0.15, #running-req: 3, #queue-req: 0, #pending-token: 0, cuda graph: False, input throughput (token/s): 88.41
+sglang-1  | [2026-05-31 15:39:18] INFO:     192.168.217.86:40020 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+sglang-1  | I0531 15:39:18.554448  7966 real_client.cpp:3556] Time taken for batch_get_into: 47581us, read store: 0us, with memory key count: 13, offload key count: 0
+sglang-1  | I0531 15:39:18.568710  7966 real_client.cpp:3556] Time taken for batch_get_into: 13955us, read store: 0us, with memory key count: 13, offload key count: 0
+sglang-1  | E0531 15:39:19.468523  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x75330a8a2000 using buffer 0x75330aa92000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.468701  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x75330b39a000 using buffer 0x75330b58a000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.469129  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x7533032b8000 using buffer 0x7533034b8000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.469309  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x75330ea72000 using buffer 0x75330ec62000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.469391  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x75330f2ac000 using buffer 0x75330f49c000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.469741  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x7533045ea000 using buffer 0x7533047ea000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.469846  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x753311652000 using buffer 0x753311842000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.469902  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x753304e24000 using buffer 0x753305024000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.469944  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x7533050e2000 using buffer 0x7533052e2000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.470480  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x753307746000 using buffer 0x753307946000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.471275  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x75330148e000 using buffer 0x75330169e000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.471306  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x7533092b2000 using buffer 0x7533094b2000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.471359  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x75330982e000 using buffer 0x753309a2e000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.471413  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x75330a068000 using buffer 0x75330a268000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.471419  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x7532fe332000 using buffer 0x7532fe552000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.471910  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x753302d3c000 using buffer 0x753302f4c000. Error: Connection reset by peer (value: 104)
+sglang-1  | [2026-05-31 15:39:19 DP5 TP5] Scheduler hit an exception: Traceback (most recent call last):
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 4041, in run_scheduler_process
+sglang-1  |     scheduler.run_event_loop()
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1534, in run_event_loop
+sglang-1  |     dispatch_event_loop(self)
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 3910, in dispatch_event_loop
+sglang-1  |     scheduler.event_loop_overlap()
+sglang-1  |   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+sglang-1  |     return func(*args, **kwargs)
+sglang-1  |            ^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1583, in event_loop_overlap
+sglang-1  |     batch = self.get_next_batch_to_run()
+sglang-1  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 2576, in get_next_batch_to_run
+sglang-1  |     new_batch = self.maybe_prepare_mlp_sync_batch(new_batch)
+sglang-1  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler_dp_attn_mixin.py", line 257, in maybe_prepare_mlp_sync_batch
+sglang-1  |     batch = self.prepare_mlp_sync_batch(batch)
+sglang-1  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler_dp_attn_mixin.py", line 230, in prepare_mlp_sync_batch
+sglang-1  |     return prepare_mlp_sync_batch_raw(
+sglang-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler_dp_attn_mixin.py", line 202, in prepare_mlp_sync_batch_raw
+sglang-1  |     mlp_sync_info.all_gather(device=device, group=group)
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler_dp_attn_mixin.py", line 81, in all_gather
+sglang-1  |     torch.distributed.all_gather_into_tensor(
+sglang-1  |   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 83, in wrapper
+sglang-1  |     return func(*args, **kwargs)
+sglang-1  |            ^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 4193, in all_gather_into_tensor
+sglang-1  |     work.wait()
+sglang-1  | RuntimeError: [/pytorch/third_party/gloo/gloo/transport/tcp/pair.cc:547] Connection closed by peer [172.17.1.3]:62103
+sglang-1  |
+sglang-1  | 2026-05-31 15:39:19.474736 ERROR    [7812] [coro_rpc_server.hpp:219] server quit with error: operation canceled
+sglang-1  | W0531 15:39:19.477387  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa0ba0000 using buffer 0x757fa0de0000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.477506  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa0e60000 using buffer 0x757fa10a0000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.477535  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa1c20000 using buffer 0x757fa1e50000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.477557  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa0620000 using buffer 0x757fa0870000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.477583  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa1ee0000 using buffer 0x757fa2110000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.477751  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa1120000 using buffer 0x757fa1360000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.478042  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa21a0000 using buffer 0x757fa23d0000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.478262  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa00a0000 using buffer 0x757fa0300000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.478335  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa13e0000 using buffer 0x757fa1620000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.478361  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa16a0000 using buffer 0x757fa18e0000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.478380  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa1960000 using buffer 0x757fa1ba0000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.479388  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa08e0000 using buffer 0x757fa0b30000. Error: Bad address (value: 14)
+sglang-1  | W0531 15:39:19.479548  7707 tcp_transport.cpp:199] ServerSession::readBody failed. Attempt to read data 0x757fa0360000 using buffer 0x757fa05c0000. Error: Bad address (value: 14)
+sglang-1  | [2026-05-31 15:39:19 DP7 TP7] Prefill batch, #new-seq: 1, #new-token: 8192, #cached-token: 10560, token usage: 0.16, #running-req: 4, #queue-req: 1, #pending-token: 10351, cuda graph: False, input throughput (token/s): 6847.71
+sglang-1  | E0531 15:39:19.482105  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x7533027c0000 using buffer 0x753302a10000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.482450  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x753303576000 using buffer 0x7533037c6000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.482460  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x75330e4f6000 using buffer 0x75330e736000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.482467  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x7532ff0e8000 using buffer 0x7532ff348000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.482523  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x75330ed30000 using buffer 0x75330ef70000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.482654  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x75330406e000 using buffer 0x7533042be000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.482924  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x753311910000 using buffer 0x753311b50000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.483135  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x7532fd83a000 using buffer 0x7532fdaaa000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.483155  7952 transfer_task.cpp:281] Batch 128714197648720 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.483166  7952 client_service.cpp:1646] Transfer failed for key 7e8255992ac67dec2a31786025f2345343ce79d937f7d928a8a882e55666a688__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.483196  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x753306156000 using buffer 0x7533063a6000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.483203  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x753306414000 using buffer 0x753306664000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.483223  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x7533066d2000 using buffer 0x753306922000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.484252  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x75330174c000 using buffer 0x7533019ac000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.484386  5920 tcp_transport.cpp:406] ClientSession::writeBody failed. Attempt to write data 0x7532fe5f0000 using buffer 0x7532fe860000. Error: Connection reset by peer (value: 104)
+sglang-1  | E0531 15:39:19.493567  7952 transfer_task.cpp:281] Batch 128714197621120 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.493570  7952 client_service.cpp:1646] Transfer failed for key a4681761100f0ee8999e8ea9a87ad10e85dbf5a11e36775b5a625dcc2fcc32b1__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.493571  7952 transfer_task.cpp:281] Batch 128714197621008 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.493572  7952 client_service.cpp:1646] Transfer failed for key 9e7efc2b7b87c328a157c2ac3f880af6b36a9a1c1ece595bfd9e2d81fa414011__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.494244  7952 transfer_task.cpp:281] Batch 128714197398608 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.494246  7952 client_service.cpp:1646] Transfer failed for key 25d2c2ca16c8d3cf12181f587f20890011445fb88c04f7da4aedee6780d1ee0c__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.495870  7952 transfer_task.cpp:281] Batch 128714197598192 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.495872  7952 client_service.cpp:1646] Transfer failed for key fe38ebb160848a1200e7102479d725aaa2a9bc7fe42d1fbaca7d31701ea95ac7__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.495874  7952 transfer_task.cpp:281] Batch 128714197598304 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.495875  7952 client_service.cpp:1646] Transfer failed for key f2b25f4ad82562d57dc5209d56f5ab23a6d44ae51f11a186616e7655e4c16541__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496090  7952 transfer_task.cpp:281] Batch 128714197596592 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496091  7952 client_service.cpp:1646] Transfer failed for key f95476d6e114ed5224da2ac85d3d6a9010ef60ac491d64cea9915621925bf6ff__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496220  7952 transfer_task.cpp:281] Batch 128714197596816 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496222  7952 client_service.cpp:1646] Transfer failed for key 729ea9de95ac4e40c2cc52b66309a242321a4364265a4cffd88720de9fdb306d__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496320  7952 transfer_task.cpp:281] Batch 128714197597856 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496321  7952 client_service.cpp:1646] Transfer failed for key 7892470295ed93e2e4ed33844a3dabf76215ef2b728e0310aa508c5ebb39b385__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496323  7952 transfer_task.cpp:281] Batch 128714197597968 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496325  7952 client_service.cpp:1646] Transfer failed for key 330a4455482cafb6bc2d9ee69babf771ca81eef7f4038ab8ac8f8c2a96e3439a__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496519  7952 transfer_task.cpp:281] Batch 128714197596032 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496521  7952 client_service.cpp:1646] Transfer failed for key e8979d1fe0c8eceb3fc630d46b15e004f1b8f171ee44c6f419a667a25116ec24__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496650  7952 transfer_task.cpp:281] Batch 128714197596256 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496651  7952 client_service.cpp:1646] Transfer failed for key 8afa759fa15b3a48800c4a36fed361b1ba4730b208aac10bb29cd86d3ee8a54a__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496773  7952 transfer_task.cpp:281] Batch 128714197382560 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496774  7952 client_service.cpp:1646] Transfer failed for key 89ce608c1fb54508e9121d56d81ce0230576ec1931a5bd3a912b988bd0d328a4__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496776  7952 transfer_task.cpp:281] Batch 128714197382672 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496778  7952 client_service.cpp:1646] Transfer failed for key 364b79e1365a7a64d146d0dee5e2ee9dd191f635fc281e220221047ff57be694__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496933  7952 transfer_task.cpp:281] Batch 128714197666128 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496934  7952 client_service.cpp:1646] Transfer failed for key b1c752e9942bbd38643c82e2448d636893baa794f36d04e67780945923ab96bb__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496937  7952 transfer_task.cpp:281] Batch 128714197666240 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496937  7952 client_service.cpp:1646] Transfer failed for key 09c37810d5fba4b649dd2f53a0b8e64f8647c43ea43d9dfdb43ee45ae5862a77__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496938  7952 transfer_task.cpp:281] Batch 128714197382000 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496939  7952 client_service.cpp:1646] Transfer failed for key 7cab59198661fddc9e613dece307a82aa5c6f676e866c3c6026a07edde406585__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.496973  7952 transfer_task.cpp:281] Batch 128714197665456 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.496975  7952 client_service.cpp:1646] Transfer failed for key 7460820a0b3e47da224d638d1df5876cc0d5f050155dc3cf532fad096638e987__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.497571  7952 transfer_task.cpp:281] Batch 128714197548224 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.497573  7952 client_service.cpp:1646] Transfer failed for key 067bc32480e8974698723929a5da8d11de7101b815696f1a5f0ad00c79970484__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.497577  7952 transfer_task.cpp:281] Batch 128714197674416 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.497578  7952 client_service.cpp:1646] Transfer failed for key fa88959b99321cad5b015c61f526a985ad7edb8b141ce0932a94ba9851e974ef__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.497587  7952 transfer_task.cpp:281] Batch 128714197674752 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.497588  7952 client_service.cpp:1646] Transfer failed for key 7d895d23689186d5a5543049cb3ea85eedabb19db2d6e4925bda8aa1cc3e2f0a__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.497601  7952 transfer_task.cpp:281] Batch 128714197547552 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.497602  7952 client_service.cpp:1646] Transfer failed for key b68216110afb05814dd9e131c59e8641becff4f328e1df57fce4909304cff602__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.497619  7952 transfer_task.cpp:281] Batch 128714197673968 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.497620  7952 client_service.cpp:1646] Transfer failed for key 3c41c3d092bac519d9de52fa3e7b0a979d328b99a39e47e88f507257960821a1__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.497714  7952 transfer_task.cpp:281] Batch 128714197632144 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.497715  7952 client_service.cpp:1646] Transfer failed for key d4184ad21cd7a608375d36af28001e75033b4b047b4317fd11b82ab3d4f83cd8__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.497722  7952 transfer_task.cpp:281] Batch 128714197632368 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.497723  7952 client_service.cpp:1646] Transfer failed for key 307c92302765fe0d89e52f1c2c75dc32fa47b251b4bcf646cd80a5621c73970f__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.497725  7952 transfer_task.cpp:281] Batch 128714197389072 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.497726  7952 client_service.cpp:1646] Transfer failed for key 0fdc86e3813eda96d0714f0758d58193f0c35caf0fe149e3b746e933d10dbe33__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.497728  7952 transfer_task.cpp:281] Batch 128714197389296 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.497730  7952 client_service.cpp:1646] Transfer failed for key ccaab966e7a0347cf768df0ace14bbc2d613126fc750ac4704e89b5d2912fee2__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.497781  7952 transfer_task.cpp:281] Batch 128714197643904 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.497783  7952 client_service.cpp:1646] Transfer failed for key 02f5fb5b695ccf28050bf563ceed44f734df866ce050025ed41aca9e2bf0d198__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | E0531 15:39:19.497785  7952 transfer_task.cpp:281] Batch 128714197644016 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.497786  7952 client_service.cpp:1646] Transfer failed for key d73f426cf94e9570cfd62437291744604197fca7d3f931617a91cf2dc5632fd4__k: TRANSFER_FAIL (Transfer 0 failed)
+sglang-1  | I0531 15:39:19.499306  7952 client_service.cpp:1747] Successfully revoked failed put for key 7e8255992ac67dec2a31786025f2345343ce79d937f7d928a8a882e55666a688__k
+sglang-1  | I0531 15:39:19.499320  7952 client_service.cpp:1747] Successfully revoked failed put for key a4681761100f0ee8999e8ea9a87ad10e85dbf5a11e36775b5a625dcc2fcc32b1__k
+sglang-1  | I0531 15:39:19.499321  7952 client_service.cpp:1747] Successfully revoked failed put for key 9e7efc2b7b87c328a157c2ac3f880af6b36a9a1c1ece595bfd9e2d81fa414011__k
+sglang-1  | I0531 15:39:19.499322  7952 client_service.cpp:1747] Successfully revoked failed put for key 25d2c2ca16c8d3cf12181f587f20890011445fb88c04f7da4aedee6780d1ee0c__k
+sglang-1  | I0531 15:39:19.499323  7952 client_service.cpp:1747] Successfully revoked failed put for key fe38ebb160848a1200e7102479d725aaa2a9bc7fe42d1fbaca7d31701ea95ac7__k
+sglang-1  | I0531 15:39:19.499325  7952 client_service.cpp:1747] Successfully revoked failed put for key f2b25f4ad82562d57dc5209d56f5ab23a6d44ae51f11a186616e7655e4c16541__k
+sglang-1  | I0531 15:39:19.499325  7952 client_service.cpp:1747] Successfully revoked failed put for key f95476d6e114ed5224da2ac85d3d6a9010ef60ac491d64cea9915621925bf6ff__k
+sglang-1  | I0531 15:39:19.499325  7952 client_service.cpp:1747] Successfully revoked failed put for key 729ea9de95ac4e40c2cc52b66309a242321a4364265a4cffd88720de9fdb306d__k
+sglang-1  | I0531 15:39:19.499326  7952 client_service.cpp:1747] Successfully revoked failed put for key 7892470295ed93e2e4ed33844a3dabf76215ef2b728e0310aa508c5ebb39b385__k
+sglang-1  | I0531 15:39:19.499327  7952 client_service.cpp:1747] Successfully revoked failed put for key 330a4455482cafb6bc2d9ee69babf771ca81eef7f4038ab8ac8f8c2a96e3439a__k
+sglang-1  | I0531 15:39:19.499327  7952 client_service.cpp:1747] Successfully revoked failed put for key e8979d1fe0c8eceb3fc630d46b15e004f1b8f171ee44c6f419a667a25116ec24__k
+sglang-1  | I0531 15:39:19.499328  7952 client_service.cpp:1747] Successfully revoked failed put for key 8afa759fa15b3a48800c4a36fed361b1ba4730b208aac10bb29cd86d3ee8a54a__k
+sglang-1  | I0531 15:39:19.499329  7952 client_service.cpp:1747] Successfully revoked failed put for key 89ce608c1fb54508e9121d56d81ce0230576ec1931a5bd3a912b988bd0d328a4__k
+sglang-1  | I0531 15:39:19.499330  7952 client_service.cpp:1747] Successfully revoked failed put for key 364b79e1365a7a64d146d0dee5e2ee9dd191f635fc281e220221047ff57be694__k
+sglang-1  | I0531 15:39:19.499331  7952 client_service.cpp:1747] Successfully revoked failed put for key b1c752e9942bbd38643c82e2448d636893baa794f36d04e67780945923ab96bb__k
+sglang-1  | I0531 15:39:19.499331  7952 client_service.cpp:1747] Successfully revoked failed put for key 09c37810d5fba4b649dd2f53a0b8e64f8647c43ea43d9dfdb43ee45ae5862a77__k
+sglang-1  | I0531 15:39:19.499332  7952 client_service.cpp:1747] Successfully revoked failed put for key 7cab59198661fddc9e613dece307a82aa5c6f676e866c3c6026a07edde406585__k
+sglang-1  | I0531 15:39:19.499333  7952 client_service.cpp:1747] Successfully revoked failed put for key 7460820a0b3e47da224d638d1df5876cc0d5f050155dc3cf532fad096638e987__k
+sglang-1  | I0531 15:39:19.499334  7952 client_service.cpp:1747] Successfully revoked failed put for key 067bc32480e8974698723929a5da8d11de7101b815696f1a5f0ad00c79970484__k
+sglang-1  | I0531 15:39:19.499336  7952 client_service.cpp:1747] Successfully revoked failed put for key fa88959b99321cad5b015c61f526a985ad7edb8b141ce0932a94ba9851e974ef__k
+sglang-1  | I0531 15:39:19.499336  7952 client_service.cpp:1747] Successfully revoked failed put for key 7d895d23689186d5a5543049cb3ea85eedabb19db2d6e4925bda8aa1cc3e2f0a__k
+sglang-1  | I0531 15:39:19.499336  7952 client_service.cpp:1747] Successfully revoked failed put for key b68216110afb05814dd9e131c59e8641becff4f328e1df57fce4909304cff602__k
+sglang-1  | I0531 15:39:19.499337  7952 client_service.cpp:1747] Successfully revoked failed put for key 3c41c3d092bac519d9de52fa3e7b0a979d328b99a39e47e88f507257960821a1__k
+sglang-1  | I0531 15:39:19.499338  7952 client_service.cpp:1747] Successfully revoked failed put for key d4184ad21cd7a608375d36af28001e75033b4b047b4317fd11b82ab3d4f83cd8__k
+sglang-1  | I0531 15:39:19.499339  7952 client_service.cpp:1747] Successfully revoked failed put for key 307c92302765fe0d89e52f1c2c75dc32fa47b251b4bcf646cd80a5621c73970f__k
+sglang-1  | I0531 15:39:19.499339  7952 client_service.cpp:1747] Successfully revoked failed put for key 0fdc86e3813eda96d0714f0758d58193f0c35caf0fe149e3b746e933d10dbe33__k
+sglang-1  | I0531 15:39:19.499347  7952 client_service.cpp:1747] Successfully revoked failed put for key ccaab966e7a0347cf768df0ace14bbc2d613126fc750ac4704e89b5d2912fee2__k
+sglang-1  | I0531 15:39:19.499347  7952 client_service.cpp:1747] Successfully revoked failed put for key 02f5fb5b695ccf28050bf563ceed44f734df866ce050025ed41aca9e2bf0d198__k
+sglang-1  | I0531 15:39:19.499348  7952 client_service.cpp:1747] Successfully revoked failed put for key d73f426cf94e9570cfd62437291744604197fca7d3f931617a91cf2dc5632fd4__k
+sglang-1  | E0531 15:39:19.499354  7952 client_service.cpp:1882] Operation for key 7e8255992ac67dec2a31786025f2345343ce79d937f7d928a8a882e55666a688__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499356  7952 client_service.cpp:1882] Operation for key a4681761100f0ee8999e8ea9a87ad10e85dbf5a11e36775b5a625dcc2fcc32b1__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499357  7952 client_service.cpp:1882] Operation for key 9e7efc2b7b87c328a157c2ac3f880af6b36a9a1c1ece595bfd9e2d81fa414011__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499358  7952 client_service.cpp:1882] Operation for key 25d2c2ca16c8d3cf12181f587f20890011445fb88c04f7da4aedee6780d1ee0c__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499359  7952 client_service.cpp:1882] Operation for key fe38ebb160848a1200e7102479d725aaa2a9bc7fe42d1fbaca7d31701ea95ac7__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499361  7952 client_service.cpp:1882] Operation for key f2b25f4ad82562d57dc5209d56f5ab23a6d44ae51f11a186616e7655e4c16541__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499361  7952 client_service.cpp:1882] Operation for key f95476d6e114ed5224da2ac85d3d6a9010ef60ac491d64cea9915621925bf6ff__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499362  7952 client_service.cpp:1882] Operation for key 729ea9de95ac4e40c2cc52b66309a242321a4364265a4cffd88720de9fdb306d__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499363  7952 client_service.cpp:1882] Operation for key 7892470295ed93e2e4ed33844a3dabf76215ef2b728e0310aa508c5ebb39b385__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499364  7952 client_service.cpp:1882] Operation for key 330a4455482cafb6bc2d9ee69babf771ca81eef7f4038ab8ac8f8c2a96e3439a__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499365  7952 client_service.cpp:1882] Operation for key e8979d1fe0c8eceb3fc630d46b15e004f1b8f171ee44c6f419a667a25116ec24__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499366  7952 client_service.cpp:1882] Operation for key 8afa759fa15b3a48800c4a36fed361b1ba4730b208aac10bb29cd86d3ee8a54a__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499366  7952 client_service.cpp:1882] Operation for key 89ce608c1fb54508e9121d56d81ce0230576ec1931a5bd3a912b988bd0d328a4__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499367  7952 client_service.cpp:1882] Operation for key 364b79e1365a7a64d146d0dee5e2ee9dd191f635fc281e220221047ff57be694__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499368  7952 client_service.cpp:1882] Operation for key b1c752e9942bbd38643c82e2448d636893baa794f36d04e67780945923ab96bb__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499369  7952 client_service.cpp:1882] Operation for key 09c37810d5fba4b649dd2f53a0b8e64f8647c43ea43d9dfdb43ee45ae5862a77__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499370  7952 client_service.cpp:1882] Operation for key 7cab59198661fddc9e613dece307a82aa5c6f676e866c3c6026a07edde406585__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499372  7952 client_service.cpp:1882] Operation for key 7460820a0b3e47da224d638d1df5876cc0d5f050155dc3cf532fad096638e987__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499372  7952 client_service.cpp:1882] Operation for key 067bc32480e8974698723929a5da8d11de7101b815696f1a5f0ad00c79970484__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499373  7952 client_service.cpp:1882] Operation for key fa88959b99321cad5b015c61f526a985ad7edb8b141ce0932a94ba9851e974ef__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499374  7952 client_service.cpp:1882] Operation for key 7d895d23689186d5a5543049cb3ea85eedabb19db2d6e4925bda8aa1cc3e2f0a__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499375  7952 client_service.cpp:1882] Operation for key b68216110afb05814dd9e131c59e8641becff4f328e1df57fce4909304cff602__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499377  7952 client_service.cpp:1882] Operation for key 3c41c3d092bac519d9de52fa3e7b0a979d328b99a39e47e88f507257960821a1__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499377  7952 client_service.cpp:1882] Operation for key d4184ad21cd7a608375d36af28001e75033b4b047b4317fd11b82ab3d4f83cd8__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499378  7952 client_service.cpp:1882] Operation for key 307c92302765fe0d89e52f1c2c75dc32fa47b251b4bcf646cd80a5621c73970f__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499379  7952 client_service.cpp:1882] Operation for key 0fdc86e3813eda96d0714f0758d58193f0c35caf0fe149e3b746e933d10dbe33__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499379  7952 client_service.cpp:1882] Operation for key ccaab966e7a0347cf768df0ace14bbc2d613126fc750ac4704e89b5d2912fee2__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499380  7952 client_service.cpp:1882] Operation for key 02f5fb5b695ccf28050bf563ceed44f734df866ce050025ed41aca9e2bf0d198__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | E0531 15:39:19.499382  7952 client_service.cpp:1882] Operation for key d73f426cf94e9570cfd62437291744604197fca7d3f931617a91cf2dc5632fd4__k failed: TRANSFER_FAIL (TRANSFER_FAIL: Transfer 0 failed; )
+sglang-1  | [2026-05-31 15:39:19 DP3 TP3] Write page to storage: 124 pages failed.
+sglang-1  | E0531 15:39:19.570602  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.570617  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.570690  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.570691  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.570837  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.570837  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.571638  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.571640  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.571748  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.571749  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.571828  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.571830  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.571985  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.571985  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.572060  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.572062  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.572516  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.572518  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.572747  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.572749  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.572798  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.572798  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.572961  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.572962  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.573026  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.573028  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.573045  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.573046  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.573066  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.573067  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.573940  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.573942  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.574247  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.574249  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.574421  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.574424  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.574447  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.574448  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.574733  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.574734  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.574972  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.574975  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.575052  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.575053  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.575299  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.575300  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.575359  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.575361  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.575559  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.575562  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.575763  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.575765  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.575810  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.575811  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.575966  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.575968  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.576193  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.576195  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.576481  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.576483  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.576647  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.576649  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.576833  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.576834  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.576900  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.576901  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.577132  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.577134  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.577248  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.577250  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.577268  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.577270  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.577960  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.577961  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.578068  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.578070  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.578130  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.578132  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.578238  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.578239  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.578622  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.578624  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.578841  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.578843  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.579265  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.579267  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.579386  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.579387  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.579473  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.579473  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.580210  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.580212  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.580271  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.580271  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.580315  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.580317  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.580355  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.580360  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.580438  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.580440  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.580457  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.580458  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.580476  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.580478  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.580564  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.580565  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.580664  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.580667  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.580883  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.580885  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.580952  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.580955  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.581040  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.581041  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | E0531 15:39:19.581104  7951 tcp_transport.cpp:708] TcpTransport::getConnection failed to create connection to 172.17.1.3:16685. Error: connect: Connection refused
+sglang-1  | E0531 15:39:19.581105  7951 tcp_transport.cpp:886] TcpTransport::startTransfer failed to get connection to 172.17.1.3:16685
+sglang-1  | [2026-05-31 15:39:19 DP7 TP7] Scheduler hit an exception: Traceback (most recent call last):
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 4041, in run_scheduler_process
+sglang-1  |     scheduler.run_event_loop()
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1534, in run_event_loop
+sglang-1  |     dispatch_event_loop(self)
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 3910, in dispatch_event_loop
+sglang-1  |     scheduler.event_loop_overlap()
+sglang-1  |   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+sglang-1  |     return func(*args, **kwargs)
+sglang-1  |            ^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1583, in event_loop_overlap
+sglang-1  |     batch = self.get_next_batch_to_run()
+sglang-1  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 2576, in get_next_batch_to_run
+sglang-1  |     new_batch = self.maybe_prepare_mlp_sync_batch(new_batch)
+sglang-1  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler_dp_attn_mixin.py", line 257, in maybe_prepare_mlp_sync_batch
+sglang-1  |     batch = self.prepare_mlp_sync_batch(batch)
+sglang-1  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler_dp_attn_mixin.py", line 230, in prepare_mlp_sync_batch
+sglang-1  |     return prepare_mlp_sync_batch_raw(
+sglang-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler_dp_attn_mixin.py", line 202, in prepare_mlp_sync_batch_raw
+sglang-1  |     mlp_sync_info.all_gather(device=device, group=group)
+sglang-1  |   File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler_dp_attn_mixin.py", line 81, in all_gather
+sglang-1  |     torch.distributed.all_gather_into_tensor(
+sglang-1  |   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 83, in wrapper
+sglang-1  |     return func(*args, **kwargs)
+sglang-1  |            ^^^^^^^^^^^^^^^^^^^^^
+sglang-1  |   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 4193, in all_gather_into_tensor
+sglang-1  |     work.wait()
+sglang-1  | RuntimeError: [/pytorch/third_party/gloo/gloo/transport/tcp/pair.cc:547] Connection closed by peer [172.17.1.3]:52365
+sglang-1  |
+sglang-1  | 2026-05-31 15:39:19.589659 ERROR    [7418] [coro_rpc_server.hpp:219] server quit with error: operation canceled
+sglang-1  | E0531 15:39:19.677121  7951 transfer_task.cpp:281] Batch 128714064995184 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.677129  7951 client_service.cpp:1100] Transfer failed for key: 1e976d1d9ed2ba7c531ad360ce4c6c644d9a60546987c8f16b93b068a2e38f48__indexer with error: -800
+sglang-1  | E0531 15:39:19.677132  7951 transfer_task.cpp:281] Batch 128714065399968 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.677134  7951 client_service.cpp:1100] Transfer failed for key: 0969a513e96caa0ee4cf33bb813e3c3109709a0866e8a21e533a5e8250c55f49__indexer with error: -800
+sglang-1  | E0531 15:39:19.677429  7951 transfer_task.cpp:281] Batch 128714064715952 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.677430  7951 client_service.cpp:1100] Transfer failed for key: f184ddc194e80f8a27fc5e0d487a789b9cdeb3e34f5ca684ff46baad827bf2d6__indexer with error: -800
+sglang-1  | E0531 15:39:19.677753  7951 transfer_task.cpp:281] Batch 128714067480176 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.677755  7951 client_service.cpp:1100] Transfer failed for key: eb50f67515e302fa8492da5b3357c416fd5befb9a99849ae3635b06297d1fa32__indexer with error: -800
+sglang-1  | E0531 15:39:19.677757  7951 transfer_task.cpp:281] Batch 128714065371728 completed with task failures: task_ids=[0]
+sglang-1  | E0531 15:39:19.677758  7951 client_service.cpp:1100] Transfer failed for key: 3f77688261440b38be84ae3dc32b9414183203a1efe54b7a1512c8e0f5462146__indexer with error: -800
