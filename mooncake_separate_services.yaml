@@ -271,3 +271,286 @@ networks:
     ipam:
       config:
         - subnet: 172.29.0.0/24
+
+
+
+
+
+name: sglang-mooncake-hgx
+
+services:
+  mooncake-master:
+    image: lmsysorg/sglang:v0.5.12.post1-cu130
+    container_name: mooncake-master
+    restart: unless-stopped
+    ipc: host
+    shm_size: 128gb
+    cap_add:
+      - SYS_NICE
+      - IPC_LOCK
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - TZ=Europe/Moscow
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      stack: 67108864
+    networks:
+      mooncake-internal:
+        ipv4_address: 172.29.0.2
+    ports:
+      - 127.0.0.1:9003:9003
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    command: >
+      mooncake_master
+      --rpc_port=50051
+      --metrics_port=9003
+      --enable_http_metadata_server=true
+      --http_metadata_server_port=8080
+      --enable_offload=true
+      --eviction_high_watermark_ratio=0.90
+      --logtostderr=true
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python3 -c "import socket; s=socket.create_connection(('127.0.0.1',50051),2); s.close()"
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
+
+  mooncake-store:
+    image: lmsysorg/sglang:v0.5.12.post1-cu130
+    container_name: mooncake-store
+    restart: unless-stopped
+    ipc: host
+    shm_size: 128gb
+    cap_add:
+      - SYS_NICE
+      - IPC_LOCK
+    security_opt:
+      - seccomp:unconfined
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      stack: 67108864
+    depends_on:
+      mooncake-master:
+        condition: service_healthy
+    networks:
+      mooncake-internal:
+        ipv4_address: 172.29.0.3
+    environment:
+      TZ: Europe/Moscow
+      MOONCAKE_GLOBAL_SEGMENT_SIZE: 128gb
+      MOONCAKE_PROTOCOL: tcp
+      MOONCAKE_DEVICE: ""
+      MOONCAKE_THREADS: "16"
+      MOONCAKE_OFFLOAD_GB: "6000"
+      MOONCAKE_OFFLOAD_FILE_STORAGE_PATH: /mooncake_cache
+      MOONCAKE_OFFLOAD_STORAGE_BACKEND_DESCRIPTOR: bucket_storage_backend
+      MOONCAKE_OFFLOAD_BUCKET_EVICTION_POLICY: lru
+      MOONCAKE_OFFLOAD_USE_URING: "1"
+    volumes:
+      - /home/cache/mooncake_cache:/mooncake_cache
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    command:
+      - bash
+      - -lc
+      - |
+        set -euo pipefail
+
+        test -d /mooncake_cache
+        test -w /mooncake_cache
+
+        python3 - <<'PY'
+        import socket, time
+
+        for host, port in [("172.29.0.2", 50051), ("172.29.0.2", 8080)]:
+            for _ in range(120):
+                try:
+                    with socket.create_connection((host, port), timeout=1):
+                        break
+                except OSError:
+                    time.sleep(1)
+            else:
+                raise SystemExit(f"{host}:{port} is not ready")
+        PY
+
+        export MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES=$$((MOONCAKE_OFFLOAD_GB * 1024 * 1024 * 1024))
+        export MOONCAKE_OFFLOAD_BUCKET_MAX_TOTAL_SIZE="$${MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES}"
+
+        echo "Starting Mooncake standalone real client"
+        echo "  protocol=$${MOONCAKE_PROTOCOL}"
+        echo "  global_segment_size=$${MOONCAKE_GLOBAL_SEGMENT_SIZE}"
+        echo "  offload_path=$${MOONCAKE_OFFLOAD_FILE_STORAGE_PATH}"
+        echo "  offload_limit_bytes=$${MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES}"
+
+        CLIENT_ARGS=(
+          mooncake_client
+          --master_server_address=172.29.0.2:50051
+          --metadata_server=http://172.29.0.2:8080/metadata
+          --host=172.29.0.3
+          --port=50052
+          --protocol="$${MOONCAKE_PROTOCOL}"
+          --global_segment_size="$${MOONCAKE_GLOBAL_SEGMENT_SIZE}"
+          --enable_offload=true
+          --threads="$${MOONCAKE_THREADS}"
+        )
+
+        if [ -n "$${MOONCAKE_DEVICE:-}" ]; then
+          CLIENT_ARGS+=(--device_names="$${MOONCAKE_DEVICE}")
+        fi
+
+        exec numactl --interleave=all "$${CLIENT_ARGS[@]}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python3 -c "import socket; s=socket.create_connection(('172.29.0.3',50052),2); s.close()"
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  sglang:
+    image: lmsysorg/sglang:v0.5.12.post1-cu130
+    container_name: sglang
+    restart: always
+    stop_grace_period: 1m
+    ipc: host
+    shm_size: 64gb
+    cap_add:
+      - SYS_NICE
+      - IPC_LOCK
+    security_opt:
+      - seccomp:unconfined
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      stack: 67108864
+    depends_on:
+      mooncake-store:
+        condition: service_healthy
+    networks:
+      mooncake-internal:
+        ipv4_address: 172.29.0.4
+    ports:
+      - 0.0.0.0:30000:30000
+    gpus: all
+    environment:
+      TZ: Europe/Moscow
+      TRITON_CACHE_DIR: /cache/triton
+      TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
+      SGLANG_DG_CACHE_DIR: /cache/dg
+      OMP_NUM_THREADS: "32"
+      SGLANG_ENABLE_SPEC_V2: "1"
+      MC_STORE_MEMCPY: "1"
+      # TODO: Add in env or hardcode. Currently empty
+      SGLANG_ADMIN_API_KEY: "${SGLANG_ADMIN_API_KEY}"
+    volumes:
+      - /opt/models:/models
+      - ./logs:/logs
+      - ./cache/torchinductor:/cache/torchinductor
+      - ./cache/triton:/cache/triton
+      - ./cache/dg:/cache/dg
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    command:
+      - bash
+      - -lc
+      - |
+        set -euo pipefail
+
+        python3 - <<'PY'
+        import socket, time
+
+        for host, port in [("172.29.0.3", 50052)]:
+            for _ in range(180):
+                try:
+                    with socket.create_connection((host, port), timeout=1):
+                        break
+                except OSError:
+                    time.sleep(1)
+            else:
+                raise SystemExit(f"{host}:{port} is not ready")
+        PY
+
+        echo "Starting SGLang with Mooncake Dummy Client -> 172.29.0.3:50052"
+
+        exec numactl --interleave=all python3 -m sglang.launch_server \
+          --model-path=/models/GLM-5.1-NVFP4 \
+          --quantization=modelopt_fp4 \
+          --served-model-name=glm \
+          --host=0.0.0.0 \
+          --port=30000 \
+          --admin-api-key="$${SGLANG_ADMIN_API_KEY}" \
+          --attention-backend=nsa \
+          --nsa-prefill-backend=trtllm \
+          --nsa-decode-backend=trtllm \
+          --moe-runner-backend=flashinfer_trtllm \
+          --enable-flashinfer-allreduce-fusion \
+          --context-length=202752 \
+          --reasoning-parser=glm45 \
+          --tool-call-parser=glm47 \
+          --trust-remote-code \
+          --kv-cache-dtype=fp8_e4m3 \
+          --enable-hierarchical-cache \
+          --hicache-io-backend=kernel \
+          --hicache-mem-layout=page_first \
+          --hicache-size=100 \
+          --hicache-write-policy=write_through_selective \
+          --hicache-storage-prefetch-policy=timeout \
+          --hicache-storage-backend=mooncake \
+          --hicache-storage-backend-extra-config='{"standalone_storage":true,"client_server_address":"172.29.0.3:50052"}' \
+          --page-size=64 \
+          --chunked-prefill-size=65536 \
+          --max-prefill-tokens=32768 \
+          --schedule-conservativeness=3.3333333333 \
+          --cuda-graph-max-bs=18 \
+          --max-running-requests=128 \
+          --tp=8 \
+          --dp=8 \
+          --enable-dp-attention \
+          --enable-dp-lm-head \
+          --load-balance-method=total_tokens \
+          --schedule-policy=lpm \
+          --mem-fraction-static=0.85 \
+          --enable-metrics \
+          --enable-custom-logit-processor \
+          --enable-cache-report \
+          --speculative-algorithm=EAGLE \
+          --speculative-num-steps=3 \
+          --speculative-eagle-topk=1 \
+          --speculative-num-draft-tokens=4 \
+          --json-model-override-args='{"index_topk_pattern":"FFSFSSSFSSFFFSSSFFFSFSSSSSSFFSFFSFFSSFFFFFFSFFFFFSFFSSSSSSFSFFFSFSSSFSFFSFFSSS"}' \
+          --model-loader-extra-config='{"enable_multithread_load":true,"num_threads":128}'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://127.0.0.1:30000/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 240s
+
+networks:
+  mooncake-internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
