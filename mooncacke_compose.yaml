@@ -1,0 +1,83 @@
+services:
+  mooncake_master:
+    image: lmsysorg/sglang:dev-cu13
+    container_name: mooncake_master
+    network_mode: host
+    ipc: host
+    shm_size: 32g
+    ulimits:
+      memlock: -1
+    command: >
+      mooncake_master
+      --rpc_port=50051
+      --metrics_port=9003
+      --enable_http_metadata_server=true
+      --http_metadata_server_port=8080
+      --eviction_high_watermark_ratio=0.95
+      --logtostderr=true
+
+  sglang:
+    image: lmsysorg/sglang:dev-cu13
+    container_name: sglang_glm51_nvfp4
+    depends_on:
+      - mooncake_master
+    network_mode: host
+    ipc: host
+    shm_size: 128g
+    ulimits:
+      memlock: -1
+    gpus: all
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      TRANSFORMERS_CACHE: /root/.cache/huggingface
+      PYTHONUNBUFFERED: "1"
+      MC_STORE_MEMCPY: "1"
+      MOONCAKE_OFFLOAD_GB: "7000"
+    volumes:
+      - /home/moncacke_cache:/mooncake_cache
+      - /home/huggingface-cache:/root/.cache/huggingface
+    command:
+      - bash
+      - -lc
+      - |
+        set -euo pipefail
+
+        export MOONCAKE_OFFLOAD_FILE_STORAGE_PATH=/mooncake_cache
+        export MOONCAKE_OFFLOAD_STORAGE_BACKEND_DESCRIPTOR=bucket_storage_backend
+        export MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES=$$(python3 - <<'PY'
+        import os
+        print(int(os.environ.get("MOONCAKE_OFFLOAD_GB", "7000")) * 1000000000)
+        PY
+        )
+        export MOONCAKE_OFFLOAD_BUCKET_MAX_TOTAL_SIZE=$$MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES
+        export MOONCAKE_OFFLOAD_BUCKET_EVICTION_POLICY=lru
+        export MOONCAKE_OFFLOAD_USE_URING=1
+
+        echo "Mooncake SSD offload: $$MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES bytes at $$MOONCAKE_OFFLOAD_FILE_STORAGE_PATH"
+
+        exec python3 -m sglang.launch_server \
+          --model-path nvidia/GLM-5.1-NVFP4 \
+          --served-model-name glm51 \
+          --host 0.0.0.0 \
+          --port 30000 \
+          --tensor-parallel-size 8 \
+          --quantization modelopt_fp4 \
+          --tool-call-parser glm47 \
+          --reasoning-parser glm45 \
+          --trust-remote-code \
+          --context-length 131072 \
+          --chunked-prefill-size 131072 \
+          --mem-fraction-static 0.80 \
+          --page-size 64 \
+          --enable-cache-report \
+          --enable-metrics \
+          --schedule-policy lpm \
+          --enable-hierarchical-cache \
+          --hicache-size 256 \
+          --hicache-io-backend direct \
+          --hicache-mem-layout page_first_direct \
+          --hicache-write-policy write_through \
+          --hicache-storage-backend mooncake \
+          --hicache-storage-prefetch-policy best_effort \
+          --file-storage-path /mooncake_cache \
+          --hicache-storage-backend-extra-config '{"local_hostname":"127.0.0.1","metadata_server":"http://127.0.0.1:8080/metadata","master_server_address":"127.0.0.1:50051","protocol":"tcp","device_name":"","global_segment_size":"64gb","check_server":false,"enable_ssd_offload":true,"ssd_offload_path":"/mooncake_cache"}'
