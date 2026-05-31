@@ -68,11 +68,11 @@ services:
       mooncake-internal:
         ipv4_address: 172.29.0.3
     environment:
-      MOONCAKE_GLOBAL_SEGMENT_SIZE: "${MOONCAKE_GLOBAL_SEGMENT_SIZE:-512gb}"
-      MOONCAKE_PROTOCOL: "${MOONCAKE_PROTOCOL:-tcp}"
-      MOONCAKE_DEVICE: "${MOONCAKE_DEVICE:-}"
-      MOONCAKE_THREADS: "${MOONCAKE_THREADS:-16}"
-      MOONCAKE_OFFLOAD_GB: "${MOONCAKE_OFFLOAD_GB:-6000}"
+      MOONCAKE_GLOBAL_SEGMENT_SIZE: 512gb
+      MOONCAKE_PROTOCOL: tcp
+      MOONCAKE_DEVICE: ""
+      MOONCAKE_THREADS: "16"
+      MOONCAKE_OFFLOAD_GB: "6000"
       MOONCAKE_OFFLOAD_FILE_STORAGE_PATH: /mooncake_cache
       MOONCAKE_OFFLOAD_STORAGE_BACKEND_DESCRIPTOR: bucket_storage_backend
       MOONCAKE_OFFLOAD_BUCKET_EVICTION_POLICY: lru
@@ -84,32 +84,30 @@ services:
       options:
         max-size: "100m"
         max-file: "5"
-    command: |
-      bash -lc '
+    command:
+      - bash
+      - -lc
+      - |
         set -euo pipefail
 
         test -d /mooncake_cache
         test -w /mooncake_cache
 
-        python3 - <<'"'"'PY'"'"'
-      import socket, time
+        python3 - <<'PY'
+        import socket, time
 
-      for host, port in [("172.29.0.2", 50051), ("172.29.0.2", 8080)]:
-          for _ in range(120):
-              try:
-                  with socket.create_connection((host, port), timeout=1):
-                      break
-              except OSError:
-                  time.sleep(1)
-          else:
-              raise SystemExit(f"{host}:{port} is not ready")
-      PY
+        for host, port in [("172.29.0.2", 50051), ("172.29.0.2", 8080)]:
+            for _ in range(120):
+                try:
+                    with socket.create_connection((host, port), timeout=1):
+                        break
+                except OSError:
+                    time.sleep(1)
+            else:
+                raise SystemExit(f"{host}:{port} is not ready")
+        PY
 
-        export MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES="$$(python3 - <<'"'"'PY'"'"'
-      import os
-      print(int(os.environ.get("MOONCAKE_OFFLOAD_GB", "6000")) * 1024 * 1024 * 1024)
-      PY
-      )"
+        export MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES=$$((MOONCAKE_OFFLOAD_GB * 1024 * 1024 * 1024))
         export MOONCAKE_OFFLOAD_BUCKET_MAX_TOTAL_SIZE="$${MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES}"
 
         echo "Starting Mooncake standalone real client"
@@ -135,7 +133,6 @@ services:
         fi
 
         exec "$${CLIENT_ARGS[@]}"
-      '
     healthcheck:
       test:
         - CMD-SHELL
@@ -190,23 +187,25 @@ services:
       options:
         max-size: "100m"
         max-file: "5"
-    command: |
-      bash -lc '
+    command:
+      - bash
+      - -lc
+      - |
         set -euo pipefail
 
-        python3 - <<'"'"'PY'"'"'
-      import socket, time
+        python3 - <<'PY'
+        import socket, time
 
-      for host, port in [("172.29.0.3", 50052)]:
-          for _ in range(180):
-              try:
-                  with socket.create_connection((host, port), timeout=1):
-                      break
-              except OSError:
-                  time.sleep(1)
-          else:
-              raise SystemExit(f"{host}:{port} is not ready")
-      PY
+        for host, port in [("172.29.0.3", 50052)]:
+            for _ in range(180):
+                try:
+                    with socket.create_connection((host, port), timeout=1):
+                        break
+                except OSError:
+                    time.sleep(1)
+            else:
+                raise SystemExit(f"{host}:{port} is not ready")
+        PY
 
         echo "Starting SGLang with Mooncake Dummy Client -> 172.29.0.3:50052"
 
@@ -255,9 +254,8 @@ services:
           --speculative-num-steps=3 \
           --speculative-eagle-topk=1 \
           --speculative-num-draft-tokens=4 \
-          --json-model-override-args='"'"'{"index_topk_pattern":"FFSFSSSFSSFFFSSSFFFSFSSSSSSFFSFFSFFSSFFFFFFSFFFFFSFFSSSSSSFSFFFSFSSSFSFFSFFSSS"}'"'"' \
-          --model-loader-extra-config='"'"'{"enable_multithread_load":true,"num_threads":128}'"'"'
-      '
+          --json-model-override-args='{"index_topk_pattern":"FFSFSSSFSSFFFSSSFFFSFSSSSSSFFSFFSFFSSFFFFFFSFFFFFSFFSSSSSSFSFFFSFSSSFSFFSFFSSS"}' \
+          --model-loader-extra-config='{"enable_multithread_load":true,"num_threads":128}'
     healthcheck:
       test:
         - CMD-SHELL
@@ -273,22 +271,3 @@ networks:
     ipam:
       config:
         - subnet: 172.29.0.0/24
-
-
-
-#.env
-SGLANG_ADMIN_API_KEY=replace-me-with-real-secret
-
-# Must be a canonical absolute path to an existing writable directory.
-# On the HGX host:
-#   mkdir -p ./cache/mooncake_cache
-#   readlink -f ./cache/mooncake_cache
-MOONCAKE_CACHE_HOST_PATH=/data/scratch/hf/sglang_hgx_mooncake/cache/mooncake_cache
-
-MOONCAKE_GLOBAL_SEGMENT_SIZE=512gb
-MOONCAKE_OFFLOAD_GB=6000
-MOONCAKE_PROTOCOL=tcp
-MOONCAKE_THREADS=16
-
-# For tcp leave empty. For rdma set the NIC/device name.
-MOONCAKE_DEVICE=
