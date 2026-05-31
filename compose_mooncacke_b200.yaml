@@ -1,0 +1,277 @@
+services:
+  mooncake_master:
+    image: lmsysorg/sglang:v0.5.12.post1-cu130
+    container_name: mooncake_master
+    networks:
+      - mooncake_net
+    ipc: host
+    shm_size: 32g
+    ulimits:
+      memlock: -1
+    command:
+      - mooncake_master
+      - --rpc_port=50051
+      - --metrics_port=9003
+      - --enable_http_metadata_server=true
+      - --http_metadata_server_port=8080
+      - --enable_offload=true
+      - --eviction_high_watermark_ratio=0.95
+      - --logtostderr=true
+
+  sglang:
+    image: lmsysorg/sglang:v0.5.12.post1-cu130
+    restart: "always"
+    depends_on:
+      - mooncake_master
+    networks:
+      - mooncake_net
+
+    stop_grace_period: 1m
+
+    ipc: host
+    shm_size: 32gb
+
+    # For faster memory alloc
+    cap_add:
+      - SYS_NICE
+      - IPC_LOCK
+    security_opt:
+      - seccomp:unconfined
+    # cap_add:
+    #   - SYS_NICE
+
+    ports:
+      - "30000:30000"
+      - "8001:8001"
+
+    environment:
+      TRITON_CACHE_DIR: '/cache/triton'
+      TORCHINDUCTOR_CACHE_DIR: '/cache/torchinductor'
+      SGLANG_DG_CACHE_DIR: '/cache/dg'
+      OMP_NUM_THREADS: 32
+      SGLANG_ENABLE_SPEC_V2: 1
+      MC_STORE_MEMCPY: "1"
+      MOONCAKE_OFFLOAD_GB: "6000"
+      # When we specify this env var it doens't recognize it
+      # Tells that it create file backend, but not really
+      #SGLANG_HICACHE_FILE_BACKEND_STORAGE_DIR: '/cache/filecache'
+
+    volumes:
+      - /opt/models:/models
+      - ./logs:/logs
+      - ./cache/torchinductor:/cache/torchinductor
+      - ./cache/triton:/cache/triton
+      - ./cache/dg:/cache/dg
+      - ./cache/mooncake_cache:/mooncake_cache
+      # - ./cache/filecache:/tmp/hicache
+      # - ./cache/filecache:/cache/filecache
+
+    ulimits:
+      memlock: -1
+      stack: 67108864
+
+    # TODO: Research schedule-convervativeness
+
+    # https://cookbook.sglang.io/autoregressive/GLM/GLM-5
+    # DP attention trades off low-concurrency latency for high-concurrency throughput
+    #
+
+    # We def. need hicache
+    # --kv-cache-dtype fp8_e4m3
+
+    # --dp 8
+    # --enable-dp-attention
+    #
+    # --quantization modelopt_fp4
+    # --model-path /models/GLM-5.1-NVFP4
+    # --dsa-prefill-backend trtllm
+    # --dsa-decode-backend trtllm
+    # --moe-runner-backend flashinfer_trtllm
+    # --enable-flashinfer-allreduce-fusion
+    #
+    # --enable-dp-lm-head
+    # --tokenizer-worker-num 8
+    # --schedule-policy lpm
+    #
+    # --enable-hierarchical-cache
+    # --hicache-size 100
+    # --hicache-write-policy write_through_selective
+    # --hicache-io-backend kernel
+    # --hicache-storage-prefetch-policy timeout
+
+    # --hicache-storage-backend-extra-config '{"root_dir": "/cache/filecache"}'
+
+    # Max running - helps with compilation
+    # Attention backend nsa
+    # cuda-graph-max-bs helps with compilation
+    # The larger chunked-prefill-size  is tradeoff between
+    # mutliple user requests and long response for a single big request
+    command:
+      - bash
+      - -lc
+      - |
+        set -euo pipefail
+
+        export MOONCAKE_OFFLOAD_FILE_STORAGE_PATH=/mooncake_cache
+        export MOONCAKE_OFFLOAD_STORAGE_BACKEND_DESCRIPTOR=bucket_storage_backend
+        export MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES=$$(python3 - <<'PY'
+        import os
+        print(int(os.environ.get("MOONCAKE_OFFLOAD_GB", "100")) * 1000000000)
+        PY
+        )
+        export MOONCAKE_OFFLOAD_BUCKET_MAX_TOTAL_SIZE=$$MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES
+        export MOONCAKE_OFFLOAD_BUCKET_EVICTION_POLICY=lru
+        export MOONCAKE_OFFLOAD_USE_URING=1
+
+        echo "Mooncake SSD offload: $$MOONCAKE_OFFLOAD_TOTAL_SIZE_LIMIT_BYTES bytes at $$MOONCAKE_OFFLOAD_FILE_STORAGE_PATH"
+
+        exec python3 -m sglang.launch_server \
+          --model-path /models/GLM-5.1-NVFP4 \
+          --quantization modelopt_fp4 \
+          --served-model-name glm \
+          --host 0.0.0.0 \
+          --port 30000 \
+          --admin-api-key 9855fce633f06feb7b0e \
+          --attention-backend nsa \
+          --nsa-prefill-backend trtllm \
+          --nsa-decode-backend trtllm \
+          --moe-runner-backend flashinfer_trtllm \
+          --enable-flashinfer-allreduce-fusion \
+          --context-length 202752 \
+          --reasoning-parser glm45 \
+          --tool-call-parser glm47 \
+          --trust-remote-code \
+          --kv-cache-dtype fp8_e4m3 \
+          --enable-hierarchical-cache \
+          --hicache-io-backend kernel \
+          --hicache-size 150 \
+          --hicache-write-policy write_through_selective \
+          --hicache-storage-prefetch-policy timeout \
+          --hicache-storage-backend mooncake \
+          --file-storage-path /mooncake_cache \
+          --hicache-storage-backend-extra-config '{"local_hostname":"sglang","metadata_server":"http://mooncake_master:8080/metadata","master_server_address":"mooncake_master:50051","protocol":"tcp","device_name":"","global_segment_size":"64gb","check_server":false,"enable_ssd_offload":true,"ssd_offload_path":"/mooncake_cache"}' \
+          --page-size 64 \
+          --chunked-prefill-size 65536 \
+          --max-prefill-tokens 32768 \
+          --schedule-conservativeness 3.3333333333 \
+          --cuda-graph-max-bs 18 \
+          --max-running-requests 128 \
+          --tp 8 \
+          --dp 8 \
+          --enable-dp-attention \
+          --enable-flashinfer-allreduce-fusion \
+          --enable-dp-lm-head \
+          --load-balance-method total_tokens \
+          --schedule-policy lpm \
+          --mem-fraction-static 0.85 \
+          --enable-metrics \
+          --enable-custom-logit-processor \
+          --enable-cache-report \
+          --speculative-algorithm EAGLE \
+          --speculative-num-steps 3 \
+          --speculative-eagle-topk 1 \
+          --speculative-num-draft-tokens 4 \
+          --json-model-override-args '{"index_topk_pattern": "FFSFSSSFSSFFFSSSFFFSFSSSSSSFFSFFSFFSSFFFFFFSFFFFFSFFSSSSSSFSFFFSFSSSFSFFSFFSSS"}' \
+          --model-loader-extra-config '{"enable_multithread_load":true,"num_threads":128}'
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:30000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+networks:
+  mooncake_net:
+    driver: bridge
+
+
+
+
+
+
+
+sglang-1  | I0531 15:47:23.418645  1378 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026537.meta
+sglang-1  | I0531 15:47:23.418669  1374 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026400.meta
+sglang-1  | I0531 15:47:23.418797  1377 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026655.meta
+sglang-1  | I0531 15:47:23.419004  1374 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026703.meta
+sglang-1  | I0531 15:47:23.419097  1371 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026679.meta
+sglang-1  | I0531 15:47:23.419137  1378 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026478.meta
+sglang-1  | I0531 15:47:23.419144  1372 aligned_client_buffer.cpp:61] AlignedClientBufferAllocator: allocated 1342177280 bytes at address 0x7a1bcbfff000 (aligned to 4096 bytes)
+sglang-1  | I0531 15:47:23.419157  1377 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026652.meta
+sglang-1  | I0531 15:47:23.419350  1374 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026471.meta
+sglang-1  | I0531 15:47:23.419445  1377 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026660.meta
+sglang-1  | I0531 15:47:23.419457  1378 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026638.meta
+sglang-1  | I0531 15:47:23.419538  1371 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026524.meta
+sglang-1  | I0531 15:47:23.419679  1374 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026476.meta
+sglang-1  | I0531 15:47:23.419759  1378 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026776.meta
+sglang-1  | I0531 15:47:23.419782  1377 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026767.meta
+sglang-1  | I0531 15:47:23.419986  1371 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026469.meta
+sglang-1  | I0531 15:47:23.419986  1374 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026562.meta
+sglang-1  | I0531 15:47:23.420089  1378 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026460.meta
+sglang-1  | I0531 15:47:23.420097  1377 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026818.meta
+sglang-1  | I0531 15:47:23.420357  1374 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026799.meta
+sglang-1  | I0531 15:47:23.420466  1371 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026674.meta
+sglang-1  | I0531 15:47:23.420532  1378 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026378.meta
+sglang-1  | I0531 15:47:23.420542  1372 storage_backend.cpp:1270] BucketStorageBackend: Allocated 33554432 bytes aligned buffer at 0x7a86bffff000
+sglang-1  | I0531 15:47:23.420648  1372 uring_file.cpp:205] [SharedUringRing] thread-local ring initialised queue_depth=32
+sglang-1  | W0531 15:47:23.420688  1372 uring_file.cpp:82] [SharedUringRing] io_uring_register_buffers failed errno=14 (Bad address) buf=0x7a1bcbfff000 size=1342177280 pages=327680 — falling back to non-fixed-buffer I/O
+sglang-1  | W0531 15:47:23.420693  1372 uring_file.cpp:689] [UringFile::register_global_buffer] registration failed addr=0x7a1bcbfff000 size=1342177280 — I/O will use regular (non-fixed-buffer) io_uring, which is correct but slightly less optimal
+sglang-1  | W0531 15:47:23.420696  1372 file_storage.cpp:193] Failed to register buffer with UringFile
+sglang-1  | I0531 15:47:23.420702  1374 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026425.meta
+sglang-1  | I0531 15:47:23.420720  1377 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026794.meta
+sglang-1  | I0531 15:47:23.420907  1372 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026630.meta
+sglang-1  | I0531 15:47:23.421001  1374 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026762.meta
+sglang-1  | I0531 15:47:23.421029  1371 uring_file.cpp:398] [UringFile] O_DIRECT mode enabled for /mooncake_cache/7291780026661.meta
+
+
+sglang-1  | I0531 15:47:22.921012  1372 transfer_metadata_plugin.cpp:1219] Found active interface eth0 with IP 172.17.1.3
+sglang-1  | I0531 15:47:22.921033  1372 transfer_engine_impl.cpp:174] Transfer Engine RPC using new RPC mapping, listening on 172.17.1.3:16769
+sglang-1  | I0531 15:47:22.921080  1378 real_client.cpp:787] Offload RPC server started on port 38121
+sglang-1  | I0531 15:47:22.922673  1372 client_service.cpp:440] Transfer engine auto discovery is disabled for protocol: tcp
+sglang-1  | E0531 15:47:22.922817  1372 transfer_metadata_plugin.cpp:290] GET http://mooncake_master:8080/metadata?key=mooncake%2Fram%2Fsglang%3A12629 http=404 body: metadata not found
+sglang-1  | W0531 15:47:22.922820  1372 transfer_metadata.cpp:880] Failed to retrieve segment descriptor, name sglang:12629
+sglang-1  | I0531 15:47:22.923118  1372 tcp_transport.cpp:541] TcpTransport: listen on port 15544
+sglang-1  | I0531 15:47:22.923244  1377 real_client.cpp:787] Offload RPC server started on port 34397
+sglang-1  | I0531 15:47:22.924140  1372 real_client.cpp:611] Successfully created client on port 12629 after 1 attempt(s)
+sglang-1  | I0531 15:47:22.925594  1372 real_client.cpp:639] Registering local memory: 16777216 bytes
+sglang-1  | I0531 15:47:22.925846  1372 real_client.cpp:706] Mounting segment: 68719476736 bytes, 68719476736 of 68719476736
+sglang-1  | I0531 15:47:22.926806  1375 client_metric.cpp:114] Client metrics enabled (default enabled)
+sglang-1  | I0531 15:47:22.926821  1375 client_metric.cpp:115] Client bandwidth summary enabled via MC_STORE_CLIENT_METRIC_BANDWIDTH
+sglang-1  | I0531 15:47:22.927469  1372 real_client.cpp:787] Offload RPC server started on port 34487
+sglang-1  | I0531 15:47:22.928396  1375 client_service.cpp:68] client_id=8449205568947229424-9765226764324837557
+sglang-1  | I0531 15:47:22.928408  1375 client_service.cpp:76] Client metrics enabled but reporting disabled (interval=0)
+sglang-1  | I0531 15:47:22.929016  1376 client_metric.cpp:114] Client metrics enabled (default enabled)
+sglang-1  | I0531 15:47:22.929030  1376 client_metric.cpp:115] Client bandwidth summary enabled via MC_STORE_CLIENT_METRIC_BANDWIDTH
+sglang-1  | I0531 15:47:22.929924  1373 client_metric.cpp:114] Client metrics enabled (default enabled)
+sglang-1  | I0531 15:47:22.929939  1373 client_metric.cpp:115] Client bandwidth summary enabled via MC_STORE_CLIENT_METRIC_BANDWIDTH
+sglang-1  | I0531 15:47:22.930626  1375 client_service.cpp:589] Storage root directory is not set. persisting data is disabled.
+sglang-1  | I0531 15:47:22.930694  1375 transfer_engine_impl.cpp:757] Metrics reporting is disabled (set MC_TE_METRIC=1 to enable)
+sglang-1  | I0531 15:47:22.930704  1375 transfer_engine_impl.cpp:107] Transfer Engine parseHostNameWithPort. server_name: sglang port: 13257
+sglang-1  | I0531 15:47:22.930860  1376 client_service.cpp:68] client_id=18177474089223985939-1271123161331848581
+sglang-1  | I0531 15:47:22.930876  1376 client_service.cpp:76] Client metrics enabled but reporting disabled (interval=0)
+sglang-1  | I0531 15:47:22.930881  1375 transfer_metadata_plugin.cpp:1219] Found active interface eth0 with IP 172.17.1.3
+sglang-1  | I0531 15:47:22.930900  1375 transfer_engine_impl.cpp:174] Transfer Engine RPC using new RPC mapping, listening on 172.17.1.3:15254
+sglang-1  | I0531 15:47:22.931928  1373 client_service.cpp:68] client_id=11262058570971392850-8281178963873776555
+sglang-1  | I0531 15:47:22.931939  1373 client_service.cpp:76] Client metrics enabled but reporting disabled (interval=0)
+sglang-1  | I0531 15:47:22.932492  1375 client_service.cpp:440] Transfer engine auto discovery is disabled for protocol: tcp
+sglang-1  | E0531 15:47:22.932754  1375 transfer_metadata_plugin.cpp:290] GET http://mooncake_master:8080/metadata?key=mooncake%2Fram%2Fsglang%3A13257 http=404 body: metadata not found
+sglang-1  | W0531 15:47:22.932760  1375 transfer_metadata.cpp:880] Failed to retrieve segment descriptor, name sglang:13257
+sglang-1  | I0531 15:47:22.933174  1373 client_service.cpp:589] Storage root directory is not set. persisting data is disabled.
+sglang-1  | I0531 15:47:22.933233  1373 transfer_engine_impl.cpp:757] Metrics reporting is disabled (set MC_TE_METRIC=1 to enable)
+sglang-1  | I0531 15:47:22.933243  1373 transfer_engine_impl.cpp:107] Transfer Engine parseHostNameWithPort. server_name: sglang port: 12767
+sglang-1  | I0531 15:47:22.933274  1375 tcp_transport.cpp:541] TcpTransport: listen on port 16875
+sglang-1  | I0531 15:47:22.933431  1373 transfer_metadata_plugin.cpp:1219] Found active interface eth0 with IP 172.17.1.3
