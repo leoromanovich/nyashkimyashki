@@ -1,0 +1,34 @@
+docker run --rm -it \
+  --name gemma4-31b-vllm-a100-int4-kv-mtp \
+  --gpus all \
+  --ipc=host \
+  --network host \
+  --shm-size 32g \
+  -v ~/.cache/huggingface:/root/.cache/huggingface \
+  -e HF_TOKEN=$HF_TOKEN \
+  -e VLLM_WORKER_MULTIPROC_METHOD=spawn \
+  -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+  vllm/vllm-openai:latest \
+    --model google/gemma-4-31B-it-qat-w4a16-ct \
+    --served-model-name gemma4-31b \
+    --host 0.0.0.0 \
+    --port 8000 \
+    \
+    --max-model-len 32768 \
+    --gpu-memory-utilization 0.90 \
+    \
+    --kv-cache-dtype fp8 \
+    --kv-offloading-size 64 \
+    --kv-offloading-backend native \
+    \
+    --speculative-config '{"method":"mtp","model":"google/gemma-4-31B-it-assistant","num_speculative_tokens":4}' \
+    \
+    --enable-prefix-caching \
+    --enable-chunked-prefill \
+    --max-num-seqs 24 \
+    --max-num-batched-tokens 8192 \
+    \
+    --limit-mm-per-prompt '{"image": 0, "audio": 0}' \
+    \
+    --reasoning-parser gemma4 \
+    --tool-call-parser gemma4
