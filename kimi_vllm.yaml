@@ -3,6 +3,7 @@ services:
     image: ${VLLM_IMAGE:-vllm/vllm-openai:v0.22.1}
     container_name: vllm-kimi-k26-8xh200
     volumes:
+      - /models:/models
       - ${HF_CACHE:-${HOME}/.cache/huggingface}:/root/.cache/huggingface
     restart: unless-stopped
     network_mode: host
@@ -12,7 +13,7 @@ services:
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
       - OMP_NUM_THREADS=${OMP_NUM_THREADS:-16}
     command:
-      - moonshotai/Kimi-K2.6
+      - /models/moonshotai/Kimi-K2.6
       - --served-model-name=kimi-k2.6
       - --trust-remote-code
       - --language-model-only
@@ -32,7 +33,7 @@ services:
       - --max-num-seqs=${VLLM_MAX_NUM_SEQS_PER_DP:-12}
       - --gpu-memory-utilization=0.85
       - --enable-prefix-caching
-      - '--speculative-config={"model":"lightseekorg/kimi-k2.6-eagle3-mla","method":"eagle3","num_speculative_tokens":3}'
+      - '--speculative-config={"model":"/models/lightseekorg/kimi-k2.6-eagle3-mla","method":"eagle3","num_speculative_tokens":3}'
       - --distributed-executor-backend=mp
       - --enable-server-load-tracking
       - --enable-prompt-tokens-details
