@@ -1,0 +1,159 @@
+services:
+  sglang:
+    image: lmsysorg/sglang:v0.5.12.post1-cu130
+    restart: "always"
+
+    stop_grace_period: 1m
+
+    ipc: host
+    shm_size: 32gb
+
+    # For faster memory alloc
+    cap_add:
+      - SYS_NICE
+
+    ports:
+      - "30000:30000"
+      - "8001:8001"
+
+    environment:
+      TRITON_CACHE_DIR: '/cache/triton'
+      TORCHINDUCTOR_CACHE_DIR: '/cache/torchinductor'
+      SGLANG_DG_CACHE_DIR: '/cache/dg'
+      OMP_NUM_THREADS: 32
+      SGLANG_ENABLE_SPEC_V2: 1
+      # When we specify this env var it doens't recognize it
+      # Tells that it create file backend, but not really
+      #SGLANG_HICACHE_FILE_BACKEND_STORAGE_DIR: '/cache/filecache'
+
+    volumes:
+      - /opt/models:/models
+      - ./logs:/logs
+      - ./cache/torchinductor:/cache/torchinductor
+      - ./cache/triton:/cache/triton
+      - ./cache/dg:/cache/dg
+      - ./cache/filecache:/tmp/hicache
+      # - ./cache/filecache:/cache/filecache
+
+    ulimits:
+      memlock: -1
+      stack: 67108864
+
+    # TODO: Research schedule-convervativeness
+
+    # https://cookbook.sglang.io/autoregressive/GLM/GLM-5
+    # DP attention trades off low-concurrency latency for high-concurrency throughput
+    #
+
+    # We def. need hicache
+    # --kv-cache-dtype fp8_e4m3
+
+    # --dp 8
+    # --enable-dp-attention
+    #
+    # --quantization modelopt_fp4
+    # --model-path /models/GLM-5.1-NVFP4
+    # --dsa-prefill-backend trtllm
+    # --dsa-decode-backend trtllm
+    # --moe-runner-backend flashinfer_trtllm
+    # --enable-flashinfer-allreduce-fusion
+    #
+    # --enable-dp-lm-head
+    # --tokenizer-worker-num 8
+    # --schedule-policy lpm
+    #
+    # --enable-hierarchical-cache
+    # --hicache-size 100
+    # --hicache-write-policy write_through_selective
+    # --hicache-io-backend kernel
+    # --hicache-storage-prefetch-policy timeout
+
+    # --hicache-storage-backend-extra-config '{"root_dir": "/cache/filecache"}'
+
+    # Max running - helps with compilation
+    # Attention backend nsa
+    # cuda-graph-max-bs helps with compilation
+    # The larger chunked-prefill-size  is tradeoff between
+    # mutliple user requests and long response for a single big request
+    command: >
+      python -m sglang.launch_server
+        --model-path /models/GLM-5.1-NVFP4
+        --quantization modelopt_fp4
+
+        --served-model-name glm
+        --host 0.0.0.0
+        --port 30000
+
+        --admin-api-key 9855fce633f06feb7b0e
+
+        --attention-backend nsa
+        --nsa-prefill-backend trtllm
+        --nsa-decode-backend trtllm
+        --moe-runner-backend flashinfer_trtllm
+        --enable-flashinfer-allreduce-fusion
+
+        --context-length 202752
+        --reasoning-parser glm45
+        --tool-call-parser glm47
+        --trust-remote-code
+
+        --kv-cache-dtype fp8_e4m3
+
+        --enable-hierarchical-cache
+
+        --hicache-io-backend kernel
+        --hicache-size 150
+        --hicache-write-policy write_through_selective
+
+        --page-size 64
+
+        --chunked-prefill-size 65536
+        --max-prefill-tokens 32768
+
+        --schedule-conservativeness 3.3333333333
+
+        --cuda-graph-max-bs 18
+        --max-running-requests 128
+
+        --tp 8
+        --dp 8
+        --enable-dp-attention
+        --enable-flashinfer-allreduce-fusion
+        --enable-dp-lm-head
+
+        --load-balance-method total_tokens
+        --schedule-policy lpm
+
+
+        --mem-fraction-static 0.85
+        --enable-metrics
+        --enable-custom-logit-processor
+
+        --speculative-algorithm EAGLE
+        --speculative-num-steps 3
+        --speculative-eagle-topk 1
+        --speculative-num-draft-tokens 4
+
+        --json-model-override-args '{"index_topk_pattern": "FFSFSSSFSSFFFSSSFFFSFSSSSSSFFSFFSFFSSFFFFFFSFFFFFSFFSSSSSSFSFFFSFSSSFSFFSFFSSS"}'
+        --model-loader-extra-config '{"enable_multithread_load":true,"num_threads":128}'
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:30000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
