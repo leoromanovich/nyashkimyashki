@@ -161,3 +161,128 @@ services:
       options:
         max-size: "100m"
         max-file: "5"
+
+
+
+services:
+  vllm:
+    image: vllm/vllm-openai:v0.22.1-x86_64-cu129-ubuntu2404
+    restart: "always"
+
+    stop_grace_period: 1m
+
+    ipc: host
+    shm_size: 32gb
+
+    cap_add:
+      - SYS_NICE
+
+    ports:
+      - "30000:30000"
+      # vLLM metrics are exposed on the same HTTP server: http://host:30000/metrics
+      # Keep this only if your infra expects the port to exist.
+      - "8001:8001"
+
+    environment:
+      HF_HOME: /cache/huggingface
+      HF_HUB_CACHE: /cache/huggingface/hub
+      VLLM_CACHE_ROOT: /cache/vllm
+      VLLM_CONFIG_ROOT: /cache/vllm-config
+
+      TRITON_CACHE_DIR: /cache/triton
+      TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
+
+      OMP_NUM_THREADS: "32"
+      TOKENIZERS_PARALLELISM: "false"
+
+      # Reasonable on HGX / NVLink systems. Remove if NCCL complains in your env.
+      NCCL_NVLS_ENABLE: "1"
+      NCCL_CUMEM_ENABLE: "1"
+
+      # For NVIDIA NVFP4 checkpoint only, not for the ordinary moonshotai checkpoint:
+      # VLLM_USE_FLASHINFER_MOE_FP4: "1"
+
+      # Prefer setting this in .env or your secret manager.
+      VLLM_API_KEY: ${VLLM_API_KEY:-9855fce633f06feb7b0e}
+
+    volumes:
+      - /models:/models
+      - ./logs:/logs
+
+      - ./cache/huggingface:/cache/huggingface
+      - ./cache/vllm:/cache/vllm
+      - ./cache/vllm-config:/cache/vllm-config
+      - ./cache/torchinductor:/cache/torchinductor
+      - ./cache/triton:/cache/triton
+
+      # Not used by this base vLLM config. See notes below about LMCache.
+      - ./cache/filecache:/cache/filecache
+
+    ulimits:
+      memlock: -1
+      stack: 67108864
+
+    entrypoint: ["vllm", "serve"]
+
+    command: >
+      /models/moonshotai/Kimi-K2.6
+
+      --served-model-name kimi
+      --host 0.0.0.0
+      --port 30000
+      --api-key ${VLLM_API_KEY:-9855fce633f06feb7b0e}
+
+      --trust-remote-code
+      --reasoning-parser kimi_k2
+      --tool-call-parser kimi_k2
+      --enable-auto-tool-choice
+
+      --max-model-len 202752
+      --kv-cache-dtype fp8
+      --block-size 64
+      --gpu-memory-utilization 0.88
+
+      --tensor-parallel-size 8
+      --decode-context-parallel-size 8
+
+      --mm-encoder-tp-mode data
+      --attention-config.use_trtllm_ragged_deepseek_prefill=True
+
+      --enable-prefix-caching
+      --enable-chunked-prefill
+      --max-num-batched-tokens 65536
+      --max-num-seqs 128
+      --max-num-partial-prefills 4
+      --max-long-partial-prefills 1
+      --long-prefill-token-threshold 8192
+
+      --max-cudagraph-capture-size 16
+      --max-parallel-loading-workers 8
+      --renderer-num-workers 8
+
+      --kv-cache-metrics
+      --disable-log-stats
+      --disable-access-log-for-endpoints /health,/metrics,/ping
+
+      --speculative-config '{"model":"/models/lightseekorg/kimi-k2.6-eagle3-mla","method":"eagle3","num_speculative_tokens":3}'
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:30000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 1200s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
