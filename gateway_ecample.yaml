@@ -1,0 +1,132 @@
+services:
+  sglang:
+    image: ${SGLANG_IMAGE:-lmsysorg/sglang:v0.5.12.post1-cu130}
+    container_name: sglang-glm5-worker
+    restart: always
+    stop_grace_period: 1m
+    ipc: host
+    shm_size: 32gb
+    cap_add:
+      - SYS_NICE
+    expose:
+      - "30000"
+    environment:
+      TRITON_CACHE_DIR: /cache/triton
+      TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
+      SGLANG_DG_CACHE_DIR: /cache/dg
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-32}
+      SGLANG_ENABLE_SPEC_V2: "1"
+    volumes:
+      - /opt/models:/models
+      - ./logs:/logs
+      - ./cache/torchinductor:/cache/torchinductor
+      - ./cache/triton:/cache/triton
+      - ./cache/dg:/cache/dg
+      - ./cache/filecache:/tmp/hicache
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    entrypoint: ["python3", "-m", "sglang.launch_server"]
+    command:
+      - --model-path=/models/GLM-5.1-NVFP4
+      - --quantization=modelopt_fp4
+      - --served-model-name=glm
+      - --host=0.0.0.0
+      - --port=30000
+      - --admin-api-key=${SGLANG_ADMIN_API_KEY:-change-me}
+      - --attention-backend=dsa
+      - --dsa-prefill-backend=trtllm
+      - --dsa-decode-backend=trtllm
+      - --moe-runner-backend=flashinfer_trtllm
+      - --fp4-gemm-backend=auto
+      - --context-length=202752
+      - --reasoning-parser=glm45
+      - --tool-call-parser=glm47
+      - --trust-remote-code
+      - --kv-cache-dtype=fp8_e4m3
+      - --enable-hierarchical-cache
+      - --hicache-io-backend=kernel
+      - --hicache-size=${SGLANG_HICACHE_SIZE:-150}
+      - --hicache-write-policy=write_through_selective
+      - --hicache-storage-prefetch-policy=timeout
+      # L3 file cache is unbounded on SGLang side; enable only with external disk quota/GC.
+      # - --hicache-storage-backend=file
+      # - '--hicache-storage-backend-extra-config={"root_dir":"/tmp/hicache"}'
+      - --page-size=64
+      - --chunked-prefill-size=65536
+      - --max-prefill-tokens=32768
+      - --schedule-conservativeness=3.3333333333
+      - --cuda-graph-max-bs=16
+      - --max-running-requests=128
+      - --tp=8
+      - --dp=8
+      - --enable-dp-attention
+      - --enable-dp-lm-head
+      - --load-balance-method=total_tokens
+      - --schedule-policy=lpm
+      - --mem-fraction-static=0.85
+      - --enable-metrics
+      - --enable-metrics-for-all-schedulers
+      - --enable-cache-report
+      - --enable-custom-logit-processor
+      - --speculative-algorithm=EAGLE
+      - --speculative-num-steps=3
+      - --speculative-eagle-topk=1
+      - --speculative-num-draft-tokens=4
+      - '--json-model-override-args={"index_topk_pattern":"FFSFSSSFSSFFFSSSFFFSFSSSSSSFFSFFSFFSSFFFFFFSFFFFFSFFSSSSSSFSFFFSFSSSFSFFSFFSSS"}'
+      - '--model-loader-extra-config={"enable_multithread_load":true,"num_threads":128}'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:30000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 120
+      start_period: 900s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: "5"
+
+  sglang-gateway:
+    image: ${SGLANG_GATEWAY_IMAGE:-lmsysorg/sgl-model-gateway:latest}
+    container_name: sglang-glm5-gateway
+    restart: always
+    depends_on:
+      sglang:
+        condition: service_healthy
+    ports:
+      - "30000:30000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    entrypoint: ["python3", "-m", "sglang_router.launch_router"]
+    command:
+      - --host=0.0.0.0
+      - --port=30000
+      - --worker-urls=http://sglang:30000
+      - --policy=manual
+      - --assignment-mode=min_load
+      - --max-idle-secs=14400
+      - --dp-aware
+      - --health-check-endpoint=/health
+      - --health-check-timeout-secs=10
+      - --health-check-interval-secs=30
+      - --worker-startup-timeout-secs=1800
+      - --request-timeout-secs=1800
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:30000/v1/models || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: "5"
