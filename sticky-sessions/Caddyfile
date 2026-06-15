@@ -1,6 +1,0 @@
-:8080 {
-	@openai_generation path /openai/chat/completions /openai/responses /openai/*/chat/completions /openai/*/responses
-	respond @openai_generation 404
-
-	reverse_proxy open-webui:8080
-}
