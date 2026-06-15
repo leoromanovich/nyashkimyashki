@@ -1,0 +1,16 @@
+model_list:
+  - model_name: glm
+    litellm_params:
+      model: os.environ/LITELLM_UPSTREAM_MODEL
+      api_base: http://smg:30000/v1
+      api_key: dummy
+    model_info:
+      mode: chat
+
+litellm_settings:
+  callbacks: smg_sticky.proxy_handler_instance
+  drop_params: true
+
+general_settings:
+  # Хук сам выставляет X-SMG-Routing-Key; клиентские x-* в upstream не пробрасываем.
+  forward_client_headers_to_llm_api: false
