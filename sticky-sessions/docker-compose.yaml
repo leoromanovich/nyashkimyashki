@@ -1,86 +1,56 @@
 services:
   sglang:
-    image: ${SGLANG_IMAGE:-lmsysorg/sglang:v0.5.12.post1-cu130}
-    container_name: sglang-glm5-sticky-worker
+    image: ${SGLANG_IMAGE:-lmsysorg/sglang:v0.5.12-cu130}
+    container_name: sglang-qwen3-worker
     restart: always
     stop_grace_period: 1m
     ipc: host
     shm_size: 32gb
     cap_add:
       - SYS_NICE
-    expose:
-      - "30000"
+    ports:
+      - "30001:30000"
+      - "8001:8001"
     environment:
       TRITON_CACHE_DIR: /cache/triton
       TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
       SGLANG_DG_CACHE_DIR: /cache/dg
       OMP_NUM_THREADS: ${OMP_NUM_THREADS:-32}
-      SGLANG_ENABLE_SPEC_V2: "1"
     volumes:
-      - /opt/models:/models
+      - /mnt/disk1/models:/models
       - ./logs:/logs
       - ./cache/torchinductor:/cache/torchinductor
       - ./cache/triton:/cache/triton
       - ./cache/dg:/cache/dg
-      - ./cache/filecache:/tmp/hicache
     ulimits:
       memlock: -1
       stack: 67108864
     entrypoint: ["python3", "-m", "sglang.launch_server"]
     command:
-      - --model-path=/models/GLM-5.1-NVFP4
-      - --quantization=modelopt_fp4
-      - --served-model-name=glm
+      - --model-path=/models/Qwen/Qwen3-8B-FP8
+      - --served-model-name=qwen3-8b
       - --host=0.0.0.0
       - --port=30000
-      - --admin-api-key=${SGLANG_ADMIN_API_KEY:-change-me}
-      - --attention-backend=dsa
-      - --dsa-prefill-backend=trtllm
-      - --dsa-decode-backend=trtllm
-      - --moe-runner-backend=flashinfer_trtllm
-      - --fp4-gemm-backend=auto
-      - --context-length=202752
-      - --reasoning-parser=glm45
-      - --tool-call-parser=glm47
       - --trust-remote-code
+      - --context-length=32768
+      - --reasoning-parser=qwen3
       - --kv-cache-dtype=fp8_e4m3
-      - --enable-hierarchical-cache
-      - --hicache-io-backend=kernel
-      - --hicache-size=${SGLANG_HICACHE_SIZE:-150}
-      - --hicache-write-policy=write_through_selective
-      - --hicache-storage-prefetch-policy=timeout
-      # L3 file cache is unbounded on SGLang side; enable only with external disk quota/GC.
-      # - --hicache-storage-backend=file
-      # - '--hicache-storage-backend-extra-config={"root_dir":"/tmp/hicache"}'
       - --page-size=64
-      - --chunked-prefill-size=65536
-      - --max-prefill-tokens=32768
+      - --chunked-prefill-size=8192
+      - --max-prefill-tokens=8192
       - --schedule-conservativeness=3.3333333333
-      - --cuda-graph-max-bs=16
-      - --max-running-requests=128
-      - --tp=8
-      - --dp=8
+      - --cuda-graph-max-bs=8
+      - --max-running-requests=32
+      - --tp=2
+      - --dp=2
       - --enable-dp-attention
       - --enable-dp-lm-head
       - --load-balance-method=total_tokens
       - --schedule-policy=lpm
-      - --mem-fraction-static=0.85
+      - --mem-fraction-static=0.80
       - --enable-metrics
-      - --enable-metrics-for-all-schedulers
       - --enable-cache-report
-      - --enable-custom-logit-processor
-      - --speculative-algorithm=EAGLE
-      - --speculative-num-steps=3
-      - --speculative-eagle-topk=1
-      - --speculative-num-draft-tokens=4
-      - '--json-model-override-args={"index_topk_pattern":"FFSFSSSFSSFFFSSSFFFSFSSSSSSFFSFFSFFSSFFFFFFSFFFFFSFFSSSSSSFSFFFSFSSSFSFFSFFSSS"}'
       - '--model-loader-extra-config={"enable_multithread_load":true,"num_threads":128}'
-    healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:30000/health', timeout=5)\" || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 120
-      start_period: 900s
     deploy:
       resources:
         reservations:
@@ -88,33 +58,44 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:30000/health', timeout=5)\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 120
+      start_period: 900s
     logging:
       driver: json-file
       options:
         max-size: 100m
         max-file: "5"
 
-  smg:
+  sglang-gateway:
     image: ${SGLANG_GATEWAY_IMAGE:-lmsysorg/sgl-model-gateway:latest}
-    container_name: smg-glm5-sticky
+    container_name: sglang-qwen3-gateway
     restart: always
     depends_on:
       sglang:
         condition: service_healthy
     ports:
-      - "${SMG_PORT:-30000}:30000"
+      - "30000:30000"
       - "${SMG_PROMETHEUS_PORT:-29000}:29000"
     environment:
       PYTHONUNBUFFERED: "1"
+    volumes:
+      - /mnt/disk1/models:/models:ro
     entrypoint: ["python3", "-m", "sglang_router.launch_router"]
     command:
       - --host=0.0.0.0
       - --port=30000
       - --worker-urls=http://sglang:30000
+      - --tokenizer-path=/models/Qwen/Qwen3-8B-FP8
+      # Sticky sessions via X-SMG-Routing-Key require manual policy.
+      # cache_aware ignores session headers and routes by prompt/prefix locality.
       - --policy=manual
       - --assignment-mode=${SMG_ASSIGNMENT_MODE:-min_group}
-      - --max-idle-secs=${SMG_MAX_IDLE_SECS:-14400}
       - --dp-aware
+      - --max-idle-secs=${SMG_MAX_IDLE_SECS:-14400}
       - --prometheus-host=0.0.0.0
       - --prometheus-port=29000
       - --health-check-endpoint=/health
@@ -136,17 +117,17 @@ services:
 
   litellm:
     image: ${LITELLM_IMAGE:-docker.litellm.ai/berriai/litellm:main-stable}
-    container_name: litellm-glm5-sticky
+    container_name: litellm-qwen3-sticky
     restart: always
     depends_on:
-      smg:
+      sglang-gateway:
         condition: service_healthy
     ports:
       - "${LITELLM_PORT:-4000}:4000"
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-sticky-test}
       LITELLM_LOG: ${LITELLM_LOG:-INFO}
-      LITELLM_UPSTREAM_MODEL: ${LITELLM_UPSTREAM_MODEL:-openai/glm}
+      LITELLM_UPSTREAM_MODEL: ${LITELLM_UPSTREAM_MODEL:-openai/qwen3-8b}
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
       - ./smg_sticky.py:/app/smg_sticky.py:ro

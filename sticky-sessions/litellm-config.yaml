@@ -1,8 +1,8 @@
 model_list:
-  - model_name: glm
+  - model_name: qwen3-8b
     litellm_params:
       model: os.environ/LITELLM_UPSTREAM_MODEL
-      api_base: http://smg:30000/v1
+      api_base: http://sglang-gateway:30000/v1
       api_key: dummy
     model_info:
       mode: chat
