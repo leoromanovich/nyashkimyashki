@@ -24,12 +24,15 @@ class SMGSticky(CustomLogger):
             getattr(user_api_key_dict, "team_id", None),
             getattr(user_api_key_dict, "org_id", None),
             headers.get("x-tenant-id"),
+            headers.get("x-openwebui-user-role"),
             "default",
         )
         agent = first(
             metadata.get("agent_id"),
             headers.get("x-litellm-agent-id"),
             headers.get("x-assistant-id"),
+            headers.get("x-openwebui-agent-id"),
+            "openwebui" if headers.get("x-openwebui-chat-id") else None,
             data.get("model"),
         )
         workspace = first(
@@ -37,17 +40,21 @@ class SMGSticky(CustomLogger):
             metadata.get("workspace_id"),
             headers.get("x-repo-id"),
             headers.get("x-workspace-id"),
+            headers.get("x-openwebui-workspace-id"),
         )
         session = first(
             metadata.get("session_id"),
             data.get("litellm_session_id"),
             headers.get("x-litellm-session-id"),
+            headers.get("x-openwebui-chat-id"),
             headers.get("x-claude-code-session-id"),
         )
         user = first(
             data.get("user"),
             getattr(user_api_key_dict, "end_user_id", None),
             getattr(user_api_key_dict, "user_id", None),
+            headers.get("x-openwebui-user-id"),
+            headers.get("x-openwebui-user-email"),
         )
 
         stable = first(session, user, data.get("litellm_call_id"))
