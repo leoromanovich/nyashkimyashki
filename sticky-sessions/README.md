@@ -7,9 +7,39 @@ client -> Open WebUI :8080 -> Open WebUI /api/chat/completions
        -> LiteLLM :4000 internal -> SMG :30000 internal -> SGLang worker internal
 ```
 
-LiteLLM сам выставляет `X-SMG-Routing-Key`; пользователям его задавать не нужно.
+LiteLLM сам выставляет `X-SMG-Routing-Key`; пользователям его задавать нельзя.
 
 Важно: для sticky по `X-SMG-Routing-Key` у SMG стоит `--policy=manual`. `cache_aware` маршрутизирует по prefix/cache locality, а не по session header.
+
+## LiteLLM hook
+
+`smg_sticky.py` нормализует разные client-specific session signals в один internal routing key:
+
+1. Удаляет любой входящий/прокинутый `X-SMG-Routing-Key`.
+2. Собирает tuple `tenant + agent + workspace + user + stable_identity`.
+3. Хеширует tuple и отправляет в SMG только `X-SMG-Routing-Key: smg:<hash>`.
+
+Приоритет `stable_identity`:
+
+1. `X-LiteLLM-Session-Id`
+2. Open WebUI `X-OpenWebUI-Chat-Id`
+3. Coding-agent aliases: `X-Codex-*`, `X-Claude-Code-Session-Id`, `X-Continue-Session-Id`, `X-OpenCode-Session(-Id)`, `X-Aider-Session-Id`, `X-Roo-Task-Id`, `X-Roo-Root-Task-Id`, `X-Kilo-Session`, `X-KILOCODE-TASKID`
+4. Generic/PI-compatible affinity headers: `session_id`, `x-session-affinity`, `x-client-request-id`
+5. fallback: `X-Repo-Id`/`X-Workspace-Id`, потом `X-User-Id`, потом LiteLLM call id
+
+Канонические headers для клиентов:
+
+```http
+X-LiteLLM-Agent-Id: open-webui|codex|opencode|aider|continue|claude-code|roo-code|kilo-code|pi
+X-LiteLLM-Session-Id: <native chat/session/thread id>
+X-Repo-Id: <repo id>
+X-Workspace-Id: <workspace id>
+X-User-Id: <user id>
+```
+
+Roo Code: native `taskId` стабилен, но штатно не уходит в LLM HTTP. Для per-task sticky нужен wrapper/source patch/plugin, который ставит `X-LiteLLM-Session-Id: <taskId>` или `X-Roo-Task-Id`.
+
+Kilo Code: native session id имеет формат `ses_...`; для OpenAI-compatible providers Kilo/opencode уже кладёт его в `x-session-affinity`, а Kilo Gateway использует `X-KILOCODE-TASKID`. Для явной схемы всё равно лучше маппить это в `X-LiteLLM-Session-Id`.
 
 ## Open WebUI
 
@@ -19,9 +49,21 @@ Compose поднимает Open WebUI и задаёт базовый OpenAI upst
 - Auth: `Bearer`
 - Key: значение `LITELLM_MASTER_KEY`
 
-Sticky headers задаются автоматически через `ENABLE_FORWARD_USER_INFO_HEADERS=true`.
+Sticky headers можно задать двумя способами.
+
+Минимальный вариант: `ENABLE_FORWARD_USER_INFO_HEADERS=true`.
 
 Open WebUI отправляет в LiteLLM `X-OpenWebUI-User-*` и `X-OpenWebUI-Chat-Id`. LiteLLM hook читает эти headers и отправляет в SMG только hashed `X-SMG-Routing-Key`.
+
+Более явный вариант: в Open WebUI connection headers к LiteLLM задать:
+
+```http
+X-LiteLLM-Agent-Id: open-webui
+X-LiteLLM-Session-Id: {{CHAT_ID}}
+X-User-Id: {{USER_ID}}
+```
+
+`{{SESSION_ID}}` в Open WebUI templates нет; sticky надо строить по `{{CHAT_ID}}`.
 
 Обычный UI Open WebUI ходит через `/api/chat/completions`. В этом варианте без edge-proxy `/openai/chat/completions` не блокируется на сетевом уровне; не отдавай этот endpoint внешним клиентам или режь его существующим nginx/ingress, если нужен жёсткий `/api`-only.
 
