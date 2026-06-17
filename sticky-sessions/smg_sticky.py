@@ -1,4 +1,6 @@
 import hashlib
+import json
+import os
 
 from litellm.integrations.custom_logger import CustomLogger
 
@@ -178,6 +180,7 @@ class SMGSticky(CustomLogger):
             ("x-kilocode-task-id", header(headers, "x-kilocode-task-id")),
             ("x-pi-session-id", header(headers, "x-pi-session-id")),
             ("pi:session_id", header(headers, "session_id")),
+            ("x-session-id", header(headers, "x-session-id")),
             ("x-session-affinity", header(headers, "x-session-affinity")),
             ("pi:x-client-request-id", header(headers, "x-client-request-id")),
             ("metadata.thread_id", metadata.get("thread_id")),
@@ -237,6 +240,19 @@ class SMGSticky(CustomLogger):
             "stable": stable_source,
         }
         data["metadata"] = metadata
+
+        if os.environ.get("SMG_STICKY_DEBUG") == "1":
+            print(
+                "SMG_STICKY "
+                + json.dumps(
+                    {
+                        "key_preview": metadata["smg_sticky_key_preview"],
+                        "sources": metadata["smg_sticky_sources"],
+                    },
+                    sort_keys=True,
+                ),
+                flush=True,
+            )
         return data
 
 

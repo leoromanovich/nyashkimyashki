@@ -1,0 +1,94 @@
+name: sticky-owui-opencode
+
+services:
+  smg:
+    image: ${SGLANG_IMAGE:-lmsysorg/sglang:dev-cu13}
+    container_name: sticky-test-smg
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:${SMG_PORT:-30100}:30000"
+      - "127.0.0.1:${SMG_METRICS_PORT:-29100}:29000"
+    volumes:
+      - /data/scratch/hf/Qwen/Qwen3.6-27B-FP8:/models/Qwen3.6-27B-FP8:ro
+    entrypoint: ["python3", "-m", "sglang_router.launch_router"]
+    command:
+      - --host=0.0.0.0
+      - --port=30000
+      - --worker-urls=http://host.docker.internal:30000
+      - --tokenizer-path=/models/Qwen3.6-27B-FP8
+      - --policy=manual
+      - --assignment-mode=${SMG_ASSIGNMENT_MODE:-min_group}
+      - --max-idle-secs=${SMG_MAX_IDLE_SECS:-14400}
+      - --prometheus-host=0.0.0.0
+      - --prometheus-port=29000
+      - --health-check-endpoint=/health
+      - --health-check-timeout-secs=10
+      - --health-check-interval-secs=5
+      - --worker-startup-timeout-secs=900
+      - --request-timeout-secs=1800
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:30000/v1/models', timeout=5)\" || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 90
+      start_period: 10s
+
+  litellm:
+    image: ${LITELLM_IMAGE:-docker.litellm.ai/berriai/litellm:main-stable}
+    container_name: sticky-test-litellm
+    restart: unless-stopped
+    depends_on:
+      smg:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${LITELLM_PORT:-4010}:4000"
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-sticky-test}
+      LITELLM_LOG: ${LITELLM_LOG:-INFO}
+      LITELLM_UPSTREAM_MODEL: ${LITELLM_UPSTREAM_MODEL:-openai/qwen}
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml:ro
+      - ./smg_sticky.py:/app/smg_sticky.py:ro
+    command:
+      - --config=/app/config.yaml
+      - --port=4000
+      - --host=0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=5)\" || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 60
+      start_period: 30s
+
+  open-webui:
+    image: ${OPENWEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main}
+    container_name: sticky-test-openwebui
+    restart: unless-stopped
+    depends_on:
+      litellm:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${OPENWEBUI_PORT:-8090}:8080"
+    environment:
+      WEBUI_AUTH: "true"
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-sticky-test-openwebui-secret}
+      WEBUI_ADMIN_EMAIL: ${WEBUI_ADMIN_EMAIL:-admin@example.com}
+      WEBUI_ADMIN_PASSWORD: ${WEBUI_ADMIN_PASSWORD:-admin-password}
+      WEBUI_ADMIN_NAME: ${WEBUI_ADMIN_NAME:-Admin}
+      ENABLE_OLLAMA_API: "false"
+      ENABLE_OPENAI_API: "true"
+      ENABLE_OPENAI_API_PASSTHROUGH: "false"
+      ENABLE_FORWARD_USER_INFO_HEADERS: "true"
+      OPENAI_API_BASE_URL: http://litellm:4000/v1
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-sticky-test}
+      DEFAULT_MODELS: ${OPENWEBUI_DEFAULT_MODEL:-qwen}
+    volumes:
+      - ./openwebui-data:/app/backend/data
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)\" || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 60
+      start_period: 30s
