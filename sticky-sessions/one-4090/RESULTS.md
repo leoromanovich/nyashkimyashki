@@ -22,7 +22,7 @@ opencode-like client -> Open WebUI :8090 -> LiteLLM :4010 -> SMG :30100 -> SGLan
 
 - SGLang: existing `sglang-qwen36-server-mooncake-ssd`, `0.0.0.0:30000`.
 - SMG: `sticky-test-smg`, `127.0.0.1:30100`, metrics `127.0.0.1:29100`, `--policy=manual`.
-- LiteLLM: host venv, `127.0.0.1:4010`, config `litellm-config-host.yaml`, hook `smg_sticky.py`.
+- LiteLLM: host venv, `127.0.0.1:4010`, config `one-4090/litellm-config.yaml`, hook `smg_sticky.py`.
 - Open WebUI: `sticky-test-openwebui`, `127.0.0.1:8090`, `ENABLE_FORWARD_USER_INFO_HEADERS=true`.
 - OWUI sticky wrapper: `sticky-test-owui-sticky-wrapper`, `127.0.0.1:8091`, proxies only chat completion endpoints.
 

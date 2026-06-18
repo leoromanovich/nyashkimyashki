@@ -35,40 +35,15 @@ services:
       retries: 90
       start_period: 10s
 
-  litellm:
-    image: ${LITELLM_IMAGE:-docker.litellm.ai/berriai/litellm:main-stable}
-    container_name: sticky-test-litellm
-    restart: unless-stopped
-    depends_on:
-      smg:
-        condition: service_healthy
-    ports:
-      - "127.0.0.1:${LITELLM_PORT:-4010}:4000"
-    environment:
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-sticky-test}
-      LITELLM_LOG: ${LITELLM_LOG:-INFO}
-      LITELLM_UPSTREAM_MODEL: ${LITELLM_UPSTREAM_MODEL:-openai/qwen}
-    volumes:
-      - ./litellm-config.yaml:/app/config.yaml:ro
-      - ./smg_sticky.py:/app/smg_sticky.py:ro
-    command:
-      - --config=/app/config.yaml
-      - --port=4000
-      - --host=0.0.0.0
-    healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=5)\" || exit 1"]
-      interval: 10s
-      timeout: 10s
-      retries: 60
-      start_period: 30s
-
   open-webui:
     image: ${OPENWEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main}
     container_name: sticky-test-openwebui
     restart: unless-stopped
     depends_on:
-      litellm:
+      smg:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:${OPENWEBUI_PORT:-8090}:8080"
     environment:
@@ -81,7 +56,7 @@ services:
       ENABLE_OPENAI_API: "true"
       ENABLE_OPENAI_API_PASSTHROUGH: "false"
       ENABLE_FORWARD_USER_INFO_HEADERS: "true"
-      OPENAI_API_BASE_URL: http://litellm:4000/v1
+      OPENAI_API_BASE_URL: http://host.docker.internal:4010/v1
       OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-sticky-test}
       DEFAULT_MODELS: ${OPENWEBUI_DEFAULT_MODEL:-qwen}
     volumes:
@@ -92,3 +67,27 @@ services:
       timeout: 10s
       retries: 60
       start_period: 30s
+
+  owui-sticky-wrapper:
+    image: ${OPENWEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main}
+    container_name: sticky-test-owui-sticky-wrapper
+    restart: unless-stopped
+    depends_on:
+      open-webui:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${OWUI_WRAPPER_PORT:-8091}:8080"
+    environment:
+      OWUI_UPSTREAM: http://open-webui:8080
+      WRAPPER_HOST: 0.0.0.0
+      WRAPPER_PORT: "8080"
+      WRAPPER_ALLOWED_PATHS: /api/chat/completions,/api/v1/chat/completions,/openai/chat/completions,/openai/v1/chat/completions
+    volumes:
+      - ../owui_sticky_wrapper.py:/wrapper/owui_sticky_wrapper.py:ro
+    entrypoint: ["python3", "/wrapper/owui_sticky_wrapper.py"]
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)\" || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 5s

@@ -1,23 +1,24 @@
+name: sticky-owui-opencode-2x4090-dpa
+
 services:
   sglang:
-    image: ${SGLANG_IMAGE:-lmsysorg/sglang:v0.5.12-cu130}
-    container_name: sglang-qwen3-worker
-    restart: always
-    stop_grace_period: 1m
+    image: ${SGLANG_IMAGE:-lmsysorg/sglang:dev-cu13}
+    container_name: sticky-2x4090-sglang-dpa
+    restart: unless-stopped
     ipc: host
     shm_size: 32gb
     cap_add:
       - SYS_NICE
-    expose:
-      - "30000"
-      - "8001"
+    ports:
+      - "127.0.0.1:${SGLANG_PORT:-30000}:30000"
     environment:
+      CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES:-0,1}
       TRITON_CACHE_DIR: /cache/triton
       TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
       SGLANG_DG_CACHE_DIR: /cache/dg
       OMP_NUM_THREADS: ${OMP_NUM_THREADS:-32}
     volumes:
-      - /mnt/disk1/models:/models
+      - ${HOST_MODEL_PATH:-/data/scratch/hf/Qwen/Qwen3.6-27B-FP8}:/models/model:ro
       - ./logs:/logs
       - ./cache/torchinductor:/cache/torchinductor
       - ./cache/triton:/cache/triton
@@ -27,30 +28,26 @@ services:
       stack: 67108864
     entrypoint: ["python3", "-m", "sglang.launch_server"]
     command:
-      - --model-path=/models/Qwen/Qwen3-8B-FP8
-      - --served-model-name=qwen3-8b
+      - --model-path=/models/model
+      - --served-model-name=${SERVED_MODEL_NAME:-qwen}
       - --host=0.0.0.0
       - --port=30000
       - --trust-remote-code
-      - --context-length=32768
-      - --reasoning-parser=qwen3
-      - --kv-cache-dtype=fp8_e4m3
-      - --page-size=64
-      - --chunked-prefill-size=8192
-      - --max-prefill-tokens=8192
-      - --schedule-conservativeness=3.3333333333
-      - --cuda-graph-max-bs=8
-      - --max-running-requests=32
-      - --tp=2
-      - --dp=2
+      - --context-length=${CONTEXT_LENGTH:-32768}
+      - --chunked-prefill-size=${CHUNKED_PREFILL_SIZE:-8192}
+      - --max-prefill-tokens=${MAX_PREFILL_TOKENS:-8192}
+      - --schedule-conservativeness=${SGLANG_SCHEDULE_CONSERVATIVENESS:-3.3333333333}
+      - --cuda-graph-max-bs=${CUDA_GRAPH_MAX_BS:-8}
+      - --max-running-requests=${MAX_RUNNING_REQUESTS:-32}
+      - --tp=${SGLANG_TP:-2}
+      - --dp=${SGLANG_DP:-2}
       - --enable-dp-attention
       - --enable-dp-lm-head
-      - --load-balance-method=total_tokens
-      - --schedule-policy=lpm
-      - --mem-fraction-static=0.80
+      - --load-balance-method=${SGLANG_LOAD_BALANCE_METHOD:-total_tokens}
+      - --schedule-policy=${SGLANG_SCHEDULE_POLICY:-lpm}
+      - --mem-fraction-static=${SGLANG_MEM_FRACTION_STATIC:-0.80}
       - --enable-metrics
       - --enable-cache-report
-      - '--model-loader-extra-config={"enable_multithread_load":true,"num_threads":128}'
     deploy:
       resources:
         reservations:
@@ -64,35 +61,25 @@ services:
       timeout: 10s
       retries: 120
       start_period: 900s
-    logging:
-      driver: json-file
-      options:
-        max-size: 100m
-        max-file: "5"
 
-  sglang-gateway:
-    image: ${SGLANG_GATEWAY_IMAGE:-lmsysorg/sgl-model-gateway:latest}
-    container_name: sglang-qwen3-gateway
-    restart: always
+  smg:
+    image: ${SGLANG_IMAGE:-lmsysorg/sglang:dev-cu13}
+    container_name: sticky-2x4090-smg-dpa
+    restart: unless-stopped
     depends_on:
       sglang:
         condition: service_healthy
-    expose:
-      - "30000"
     ports:
-      - "${SMG_PROMETHEUS_PORT:-29000}:29000"
-    environment:
-      PYTHONUNBUFFERED: "1"
+      - "127.0.0.1:${SMG_PORT:-30100}:30000"
+      - "127.0.0.1:${SMG_METRICS_PORT:-29100}:29000"
     volumes:
-      - /mnt/disk1/models:/models:ro
+      - ${HOST_MODEL_PATH:-/data/scratch/hf/Qwen/Qwen3.6-27B-FP8}:/models/model:ro
     entrypoint: ["python3", "-m", "sglang_router.launch_router"]
     command:
       - --host=0.0.0.0
       - --port=30000
       - --worker-urls=http://sglang:30000
-      - --tokenizer-path=/models/Qwen/Qwen3-8B-FP8
-      # Sticky sessions via X-SMG-Routing-Key require manual policy.
-      # cache_aware ignores session headers and routes by prompt/prefix locality.
+      - --tokenizer-path=/models/model
       - --policy=manual
       - --assignment-mode=${SMG_ASSIGNMENT_MODE:-min_group}
       - --dp-aware
@@ -108,79 +95,87 @@ services:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:30000/v1/models', timeout=5)\" || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 20
+      retries: 60
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: 100m
-        max-file: "5"
 
   litellm:
     image: ${LITELLM_IMAGE:-docker.litellm.ai/berriai/litellm:main-stable}
-    container_name: litellm-qwen3-sticky
-    restart: always
+    container_name: sticky-2x4090-litellm-dpa
+    restart: unless-stopped
     depends_on:
-      sglang-gateway:
+      smg:
         condition: service_healthy
-    expose:
-      - "4000"
+    ports:
+      - "127.0.0.1:${LITELLM_PORT:-4010}:4000"
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-sticky-test}
       LITELLM_LOG: ${LITELLM_LOG:-INFO}
-      LITELLM_UPSTREAM_MODEL: ${LITELLM_UPSTREAM_MODEL:-openai/qwen3-8b}
+      LITELLM_UPSTREAM_MODEL: ${LITELLM_UPSTREAM_MODEL:-openai/qwen}
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
-      - ./smg_sticky.py:/app/smg_sticky.py:ro
+      - ../smg_sticky.py:/app/smg_sticky.py:ro
     command:
-      - "--config=/app/config.yaml"
-      - "--port=4000"
-      - "--host=0.0.0.0"
+      - --config=/app/config.yaml
+      - --port=4000
+      - --host=0.0.0.0
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=5)\" || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 20
+      retries: 60
       start_period: 60s
-    logging:
-      driver: json-file
-      options:
-        max-size: 100m
-        max-file: "5"
 
   open-webui:
     image: ${OPENWEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main}
-    container_name: openwebui-qwen3-sticky
-    restart: always
+    container_name: sticky-2x4090-openwebui-dpa
+    restart: unless-stopped
     depends_on:
       litellm:
         condition: service_healthy
     ports:
-      - "${OPENWEBUI_PORT:-8080}:8080"
+      - "127.0.0.1:${OPENWEBUI_PORT:-8090}:8080"
     environment:
       WEBUI_AUTH: "true"
-      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-change-me-openwebui-secret}
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-sticky-test-openwebui-secret}
       WEBUI_ADMIN_EMAIL: ${WEBUI_ADMIN_EMAIL:-admin@example.com}
       WEBUI_ADMIN_PASSWORD: ${WEBUI_ADMIN_PASSWORD:-admin-password}
       WEBUI_ADMIN_NAME: ${WEBUI_ADMIN_NAME:-Admin}
       ENABLE_OLLAMA_API: "false"
       ENABLE_OPENAI_API: "true"
       ENABLE_OPENAI_API_PASSTHROUGH: "false"
-      # Sends X-OpenWebUI-User-* and X-OpenWebUI-Chat-Id to LiteLLM.
       ENABLE_FORWARD_USER_INFO_HEADERS: "true"
       OPENAI_API_BASE_URL: http://litellm:4000/v1
       OPENAI_API_KEY: ${LITELLM_MASTER_KEY:-sk-sticky-test}
-      DEFAULT_MODELS: ${OPENWEBUI_DEFAULT_MODEL:-qwen3-8b}
+      DEFAULT_MODELS: ${OPENWEBUI_DEFAULT_MODEL:-qwen}
     volumes:
       - ./openwebui-data:/app/backend/data
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)\" || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 20
+      retries: 60
       start_period: 60s
-    logging:
-      driver: json-file
-      options:
-        max-size: 100m
-        max-file: "5"
+
+  owui-sticky-wrapper:
+    image: ${OPENWEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main}
+    container_name: sticky-2x4090-owui-sticky-wrapper-dpa
+    restart: unless-stopped
+    depends_on:
+      open-webui:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${OWUI_WRAPPER_PORT:-8091}:8080"
+    environment:
+      OWUI_UPSTREAM: http://open-webui:8080
+      WRAPPER_HOST: 0.0.0.0
+      WRAPPER_PORT: "8080"
+      WRAPPER_ALLOWED_PATHS: /api/chat/completions,/api/v1/chat/completions,/openai/chat/completions,/openai/v1/chat/completions
+    volumes:
+      - ../owui_sticky_wrapper.py:/wrapper/owui_sticky_wrapper.py:ro
+    entrypoint: ["python3", "/wrapper/owui_sticky_wrapper.py"]
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 5s

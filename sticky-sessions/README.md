@@ -19,14 +19,10 @@ browser / agents
 ## Files
 
 - `smg_sticky.py` - LiteLLM hook: строит internal `X-SMG-Routing-Key`.
-- `remote-opencode-owui/owui_sticky_wrapper.py` - production wrapper перед OWUI chat-completion ручками.
-- `remote-opencode-owui/docker-compose.host-litellm.yaml` - remote стенд: existing SGLang + SMG + OWUI + wrapper + host LiteLLM.
-- `remote-opencode-owui/docker-compose.2x4090-dpa.yaml` - full stack для 2x4090 DPA: SGLang `TP=2 DP=2` + SMG `--dp-aware` + LiteLLM + OWUI + wrapper.
-- `remote-opencode-owui/env.2x4090-dpa.example` - env template для 2x4090 DPA compose.
-- `remote-opencode-owui/INGRESS.md` - production ingress routes.
-- `remote-opencode-owui/RESULTS.md` - live checks на `192.168.0.59`.
-- `remote-opencode-owui/run_sticky_probe.py` - HTTP probe.
-- `remote-opencode-owui/run_opencode_real_probe.py` - real opencode probe.
+- `owui_sticky_wrapper.py` - wrapper перед OWUI chat-completion ручками.
+- `INGRESS.md` - production ingress routes.
+- `one-4090/` - проверенный стенд на `192.168.0.59`: existing SGLang + host LiteLLM + SMG + OWUI + wrapper.
+- `two-4090-dpa/` - целевой стенд на 2x4090: SGLang `TP=2 DP=2` + SMG `--dp-aware` + LiteLLM + OWUI + wrapper.
 
 ## Current Tested State
 
@@ -326,11 +322,18 @@ custom-python-agent
 
 ## Compose
 
-Remote compose with existing host LiteLLM:
+One 4090 tested setup:
 
 ```bash
-cd /data/scratch/hf/sglang_hicache_research/sticky_owui_opencode
-docker compose -f docker-compose.host-litellm.yaml up -d
+cd nyashkimyashki/sticky-sessions/one-4090
+docker compose up -d
+```
+
+This setup assumes existing host services:
+
+```text
+SGLang   127.0.0.1:30000
+LiteLLM  127.0.0.1:4010
 ```
 
 Important ports:
@@ -348,13 +351,13 @@ SGLang               127.0.0.1:30000
 
 ```bash
 git clone https://github.com/leoromanovich/nyashkimyashki.git
-cd nyashkimyashki/sticky-sessions/remote-opencode-owui
+cd nyashkimyashki/sticky-sessions/two-4090-dpa
 
-cp env.2x4090-dpa.example .env.2x4090-dpa
-sed -i "s/change-me-random-hex/$(openssl rand -hex 32)/" .env.2x4090-dpa
+cp env.example .env
+sed -i "s/change-me-random-hex/$(openssl rand -hex 32)/" .env
 # edit HOST_MODEL_PATH, WEBUI_ADMIN_EMAIL, WEBUI_ADMIN_PASSWORD if needed
 
-docker compose --env-file .env.2x4090-dpa -f docker-compose.2x4090-dpa.yaml up -d
+docker compose --env-file .env up -d
 ```
 
 This starts one SGLang worker across both GPUs with DPA:
