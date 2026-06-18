@@ -21,6 +21,8 @@ browser / agents
 - `smg_sticky.py` - LiteLLM hook: строит internal `X-SMG-Routing-Key`.
 - `remote-opencode-owui/owui_sticky_wrapper.py` - production wrapper перед OWUI chat-completion ручками.
 - `remote-opencode-owui/docker-compose.host-litellm.yaml` - remote стенд: existing SGLang + SMG + OWUI + wrapper + host LiteLLM.
+- `remote-opencode-owui/docker-compose.2x4090-tp2.yaml` - full stack для первого прогона на 2x4090: SGLang `TP=2` + SMG + LiteLLM + OWUI + wrapper.
+- `remote-opencode-owui/env.2x4090.example` - env template для 2x4090 compose.
 - `remote-opencode-owui/INGRESS.md` - production ingress routes.
 - `remote-opencode-owui/RESULTS.md` - live checks на `192.168.0.59`.
 - `remote-opencode-owui/run_sticky_probe.py` - HTTP probe.
@@ -341,6 +343,32 @@ SMG                  127.0.0.1:30100
 SMG metrics          127.0.0.1:29100
 SGLang               127.0.0.1:30000
 ```
+
+2x4090 first-run compose:
+
+```bash
+git clone https://github.com/leoromanovich/nyashkimyashki.git
+cd nyashkimyashki/sticky-sessions/remote-opencode-owui
+
+cp env.2x4090.example .env.2x4090
+sed -i "s/change-me-random-hex/$(openssl rand -hex 32)/" .env.2x4090
+# edit HOST_MODEL_PATH, WEBUI_ADMIN_EMAIL, WEBUI_ADMIN_PASSWORD if needed
+
+docker compose --env-file .env.2x4090 -f docker-compose.2x4090-tp2.yaml up -d
+```
+
+This starts one SGLang worker across both GPUs:
+
+```text
+SGLang TP=2          127.0.0.1:30000
+SMG                  127.0.0.1:30100
+SMG metrics          127.0.0.1:29100
+LiteLLM              127.0.0.1:4010
+Open WebUI           127.0.0.1:8090
+OWUI sticky wrapper  127.0.0.1:8091
+```
+
+This mode validates the full header/session path, but it has only one SMG worker URL. For worker-level sticky across two cards, run two one-GPU SGLang replicas and point SMG at both workers; that requires a model that fits in 24GB per GPU.
 
 ## Verification
 
