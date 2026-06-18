@@ -23,8 +23,6 @@ browser / agents
 - `remote-opencode-owui/docker-compose.host-litellm.yaml` - remote стенд: existing SGLang + SMG + OWUI + wrapper + host LiteLLM.
 - `remote-opencode-owui/docker-compose.2x4090-dpa.yaml` - full stack для 2x4090 DPA: SGLang `TP=2 DP=2` + SMG `--dp-aware` + LiteLLM + OWUI + wrapper.
 - `remote-opencode-owui/env.2x4090-dpa.example` - env template для 2x4090 DPA compose.
-- `remote-opencode-owui/docker-compose.2x4090-tp2.yaml` - fallback/smoke-test: SGLang `TP=2` без DPA.
-- `remote-opencode-owui/env.2x4090.example` - env template для TP=2 fallback compose.
 - `remote-opencode-owui/INGRESS.md` - production ingress routes.
 - `remote-opencode-owui/RESULTS.md` - live checks на `192.168.0.59`.
 - `remote-opencode-owui/run_sticky_probe.py` - HTTP probe.
@@ -371,8 +369,6 @@ OWUI sticky wrapper    127.0.0.1:8091
 ```
 
 In this mode SMG discovers SGLang DP ranks and pins `X-SMG-Routing-Key` to rank-specific logical workers. With `SGLANG_DP=2`, SGLang divides `CHUNKED_PREFILL_SIZE` and `MAX_RUNNING_REQUESTS` by 2 internally.
-
-If DPA fails on a specific model/image, use `docker-compose.2x4090-tp2.yaml` only as a fallback to verify the OWUI -> LiteLLM -> SMG header path.
 
 ## Verification
 
