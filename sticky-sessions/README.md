@@ -22,7 +22,7 @@ browser / agents
 - `owui_sticky_wrapper.py` - wrapper перед OWUI chat-completion ручками.
 - `INGRESS.md` - production ingress routes.
 - `one-4090/` - проверенный стенд на `192.168.0.59`: existing SGLang + host LiteLLM + SMG + OWUI + wrapper.
-- `two-4090-dpa/` - целевой стенд на 2x4090: модель задается только через `.env`; SGLang `TP=2 DP=2` + SMG `--dp-aware` + LiteLLM + OWUI + wrapper.
+- `two-4090-dpa/` - целевой стенд на 2x4090: `/mnt/disk1/models/Qwen/Qwen3-8B-FP8`, SGLang `TP=2 DP=2` + SMG `--dp-aware` + LiteLLM + OWUI + wrapper.
 
 ## Current Tested State
 
@@ -355,8 +355,7 @@ cd nyashkimyashki/sticky-sessions/two-4090-dpa
 
 cp env.example .env
 sed -i "s/change-me-random-hex/$(openssl rand -hex 32)/" .env
-# set HOST_MODEL_PATH, SERVED_MODEL_NAME, LITELLM_UPSTREAM_MODEL, OPENWEBUI_DEFAULT_MODEL
-# edit WEBUI_ADMIN_EMAIL, WEBUI_ADMIN_PASSWORD
+# edit WEBUI_ADMIN_EMAIL, WEBUI_ADMIN_PASSWORD if needed
 
 docker compose --env-file .env up -d
 ```
