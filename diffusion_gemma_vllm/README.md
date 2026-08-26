@@ -98,7 +98,7 @@ Cache hierarchy: GPU → 24 GiB RAM → local NVMe. В `/data/scratch` треб�
 
 Проверено на RTX 4090 48 GB с vLLM 0.26.0: compressed-tensors W8A8 выбрал
 Cutlass INT8 linear и Triton INT8 MoE; weights заняли 25.83 GiB, GPU KV —
-12.1 GiB/166k tokens, steady HBM — 42.6 GiB. Text cold/repeat — 5.02/3.10 с;
+12.1 GiB/166k tokens, steady HBM — 41.6 GiB. Text cold/repeat — 5.02/3.10 с;
 vision cold/filesystem-cached/MM-hot — 4.11/1.82/1.55 с. После restart NVMe
 вернул 239.9 MB KV: 1152 external hits из 1171 queries.
 
