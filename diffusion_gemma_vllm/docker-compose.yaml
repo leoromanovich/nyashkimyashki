@@ -49,6 +49,8 @@ services:
       --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION:-0.85}
       --enable-prefix-caching
       --enable-chunked-prefill
+      --kv-offloading-size ${KV_CPU_GIB:?set KV_CPU_GIB}
+      --kv-offloading-backend native
       --kv-transfer-config '${KV_TRANSFER_CONFIG:?set KV_TRANSFER_CONFIG}'
       --mm-processor-kwargs '{"max_soft_tokens":${MM_MAX_SOFT_TOKENS:-1120}}'
       --limit-mm-per-prompt '{"image":1,"video":0}'

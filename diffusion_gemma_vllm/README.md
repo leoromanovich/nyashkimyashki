@@ -114,17 +114,23 @@ pinned host RAM → filesystem tier `/kv-cache`. LRU и prompt-only offload по
 для повторных system/repository prefixes и многократного анализа одной картинки.
 `MM_PROCESSOR_CACHE_GB=4` кэширует image preprocessing.
 
+Размер RAM tier задаёт `KV_CPU_GIB=128`. Compose передаёт его как
+`--kv-offloading-size 128`; vLLM трактует значение в GiB и добавляет
+`cpu_bytes_to_use` в connector config.
+
 `KV_TRANSFER_CONFIG` уже включает NVMe tier:
 
 ```json
-{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"spec_name":"TieringOffloadingSpec","cpu_bytes_to_use":137438953472,"eviction_policy":"lru","offload_prompt_only":true,"secondary_tiers":[{"type":"fs","root_dir":"/kv-cache","n_read_threads":32,"n_write_threads":16}]}}
+{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"spec_name":"TieringOffloadingSpec","eviction_policy":"lru","offload_prompt_only":true,"secondary_tiers":[{"type":"fs","root_dir":"/kv-cache","n_read_threads":32,"n_write_threads":16}]}}
 ```
 
-`preflight.sh` требует минимум `KV_DISK_MIN_FREE_GB=512`. Сам FS connector не
-задаёт capacity limit, поэтому обязательны filesystem quota и disk-space alert.
-Стартовая quota — 2 TiB. Следите за hit rate, promotion latency, CPU-cache usage
-и NVMe writes через `/metrics`. Фиксированный `PYTHONHASHSEED=0` сохраняет
-стабильные block hashes между рестартами.
+`preflight.sh` требует минимум `KV_DISK_MIN_FREE_GB=512`. FS connector не задаёт
+capacity limit. Docker Compose также не ограничивает размер bind mount. Лимит
+задаёт отдельный LVM volume, ZFS dataset или XFS/ext4 project quota на
+`KV_CACHE_DIR`; стартовый размер — 2 TiB. Оставьте 5–10% свободного места и
+настройте disk-space alert. Следите за hit rate, promotion latency,
+CPU-cache usage и NVMe writes через `/metrics`. Фиксированный
+`PYTHONHASHSEED=0` сохраняет стабильные block hashes между рестартами.
 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` запрещён: CUDA VMM может
 инвалидировать pinned KV pages OffloadingConnector.
 
