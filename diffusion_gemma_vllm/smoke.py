@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Text, prefix-cache and optional image smoke checks for the recipe."""
+"""Text, prefix-cache and optional image smoke checks for local DiffusionGemma."""
 
 from __future__ import annotations
 
@@ -15,9 +15,18 @@ from pathlib import Path
 from typing import Any
 
 
-def request_json(
+CACHE_METRICS = {
+    "vllm:external_prefix_cache_hits_total",
+    "vllm:kv_offload_load_bytes_total",
+    "vllm:kv_offload_store_bytes_total",
+    "vllm:mm_cache_hits_total",
+    "vllm:prompt_tokens_cached_total",
+}
+
+
+def request_text(
     method: str, url: str, api_key: str, payload: dict[str, Any] | None = None
-) -> dict[str, Any]:
+) -> str:
     data = None if payload is None else json.dumps(payload).encode()
     request = urllib.request.Request(
         url,
@@ -30,10 +39,28 @@ def request_json(
     )
     try:
         with urllib.request.urlopen(request, timeout=600) as response:
-            return json.load(response)
+            return response.read().decode()
     except urllib.error.HTTPError as error:
         detail = error.read().decode(errors="replace")
         raise RuntimeError(f"HTTP {error.code}: {detail}") from error
+
+
+def request_json(
+    method: str, url: str, api_key: str, payload: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    return json.loads(request_text(method, url, api_key, payload))
+
+
+def metric_totals(text: str) -> dict[str, float]:
+    totals = {name: 0.0 for name in CACHE_METRICS}
+    for line in text.splitlines():
+        if not line or line.startswith("#"):
+            continue
+        sample, separator, raw_value = line.rpartition(" ")
+        name = sample.split("{", 1)[0]
+        if separator and name in totals:
+            totals[name] += float(raw_value)
+    return totals
 
 
 def chat(
@@ -47,7 +74,6 @@ def chat(
         "model": model,
         "messages": [{"role": "user", "content": content}],
         "max_tokens": max_tokens,
-        "temperature": 0.0,
         "chat_template_kwargs": {"enable_thinking": False},
     }
     started = time.monotonic()
@@ -84,6 +110,8 @@ def main() -> int:
     base_url = args.base_url.rstrip("/")
     models = request_json("GET", f"{base_url}/models", args.api_key)
     model = args.model or models["data"][0]["id"]
+    metrics_url = f"{base_url.removesuffix('/v1')}/metrics"
+    metrics_before = metric_totals(request_text("GET", metrics_url, args.api_key))
     prompt = "Ответь одним предложением: какое главное свойство A100 полезно для inference?"
 
     first, first_s = chat(base_url, args.api_key, model, prompt, 128)
@@ -107,10 +135,23 @@ def main() -> int:
             },
         ]
         response, elapsed = chat(base_url, args.api_key, model, content, 768)
+        repeated, repeated_elapsed = chat(
+            base_url, args.api_key, model, content, 768
+        )
         print(json.dumps({
             "image_seconds": round(elapsed, 3),
+            "image_repeat_seconds": round(repeated_elapsed, 3),
             "image_answer": response["choices"][0]["message"]["content"],
+            "image_repeat_answer": repeated["choices"][0]["message"]["content"],
         }, ensure_ascii=False, indent=2))
+
+    metrics_after = metric_totals(request_text("GET", metrics_url, args.api_key))
+    print(json.dumps({
+        "cache_metric_deltas": {
+            name.removeprefix("vllm:"): round(metrics_after[name] - value, 3)
+            for name, value in sorted(metrics_before.items())
+        }
+    }, ensure_ascii=False, indent=2))
 
     return 0
 

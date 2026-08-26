@@ -69,11 +69,12 @@ gpu_name="${gpu_name# }"
 gpu_memory_mib="${gpu_memory_mib// /}"
 driver_version="${driver_version// /}"
 
-if [[ "$gpu_name" != *A100* ]]; then
-  printf 'GPU %s is outside this recipe contract; expected A100\n' "$gpu_name" >&2
+if [[ "$gpu_name" != *"${EXPECTED_GPU_NAME:-A100}"* ]]; then
+  printf 'GPU %s is outside this profile; expected name containing %s\n' \
+    "$gpu_name" "${EXPECTED_GPU_NAME:-A100}" >&2
   exit 2
 fi
-if (( gpu_memory_mib < 39000 )); then
+if (( gpu_memory_mib < ${MIN_GPU_MEMORY_MIB:-79000} )); then
   printf 'GPU memory is too small: %s MiB\n' "$gpu_memory_mib" >&2
   exit 2
 fi

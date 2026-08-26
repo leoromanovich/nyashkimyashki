@@ -1,9 +1,9 @@
-name: diffusiongemma-a100
+name: diffusion-gemma-vllm
 
 services:
   diffusiongemma:
     image: ${VLLM_IMAGE:?set VLLM_IMAGE}
-    container_name: diffusiongemma-a100
+    container_name: diffusion-gemma-vllm
     restart: unless-stopped
     ipc: host
     shm_size: 32gb
@@ -15,7 +15,6 @@ services:
       HF_HUB_OFFLINE: "1"
       NVIDIA_VISIBLE_DEVICES: ${GPU_DEVICE_ID:-0}
       PYTHONHASHSEED: "0"
-      PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
       TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
       TRANSFORMERS_OFFLINE: "1"
       VLLM_API_KEY: ${VLLM_API_KEY:?set VLLM_API_KEY}
@@ -42,7 +41,6 @@ services:
       --served-model-name ${VLLM_SERVED_MODEL:-diffusiongemma}
       --host 0.0.0.0
       --port 8000
-      --api-key "${VLLM_API_KEY:?set VLLM_API_KEY}"
       --dtype bfloat16
       --attention-backend TRITON_ATTN
       --max-model-len ${MAX_MODEL_LEN:-65536}
