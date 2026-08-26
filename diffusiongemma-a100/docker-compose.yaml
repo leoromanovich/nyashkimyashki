@@ -1,0 +1,75 @@
+name: diffusiongemma-a100
+
+services:
+  diffusiongemma:
+    image: ${VLLM_IMAGE:?set VLLM_IMAGE}
+    container_name: diffusiongemma-a100
+    restart: unless-stopped
+    ipc: host
+    shm_size: 32gb
+    stop_grace_period: 120s
+    ports:
+      - "${VLLM_BIND_IP:-127.0.0.1}:${VLLM_PORT:-8000}:8000"
+    environment:
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      HF_HUB_OFFLINE: "1"
+      NVIDIA_VISIBLE_DEVICES: ${GPU_DEVICE_ID:-0}
+      PYTHONHASHSEED: "0"
+      PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+      TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
+      TRANSFORMERS_OFFLINE: "1"
+      VLLM_API_KEY: ${VLLM_API_KEY:?set VLLM_API_KEY}
+      VLLM_CACHE_ROOT: /cache/vllm
+      VLLM_ENABLE_CUDA_COMPATIBILITY: ${VLLM_ENABLE_CUDA_COMPATIBILITY:-1}
+      VLLM_USE_V2_MODEL_RUNNER: "1"
+    volumes:
+      - ${MODEL_DIR:?set MODEL_DIR}:/models:ro
+      - ${VLLM_CACHE_DIR:?set VLLM_CACHE_DIR}:/cache
+      - ${KV_CACHE_DIR:?set KV_CACHE_DIR}:/kv-cache
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: >-
+      --model /models
+      --served-model-name ${VLLM_SERVED_MODEL:-diffusiongemma}
+      --host 0.0.0.0
+      --port 8000
+      --api-key "${VLLM_API_KEY:?set VLLM_API_KEY}"
+      --dtype bfloat16
+      --attention-backend TRITON_ATTN
+      --max-model-len ${MAX_MODEL_LEN:-65536}
+      --max-num-seqs ${MAX_NUM_SEQS:-4}
+      --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS:-8192}
+      --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION:-0.85}
+      --enable-prefix-caching
+      --enable-chunked-prefill
+      --kv-transfer-config '${KV_TRANSFER_CONFIG:?set KV_TRANSFER_CONFIG}'
+      --mm-processor-kwargs '{"max_soft_tokens":${MM_MAX_SOFT_TOKENS:-1120}}'
+      --limit-mm-per-prompt '{"image":1,"video":0}'
+      --mm-processor-cache-gb ${MM_PROCESSOR_CACHE_GB:-4}
+      --hf-overrides '{"diffusion_sampler":"entropy_bound","diffusion_entropy_bound":0.1}'
+      --diffusion-config '{"canvas_length":256}'
+      --generation-config vllm
+      --reasoning-parser gemma4
+      --enable-request-id-headers
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - >-
+          import os,urllib.request;
+          r=urllib.request.Request('http://127.0.0.1:8000/v1/models',headers={'Authorization':'Bearer '+os.environ['VLLM_API_KEY']});
+          urllib.request.urlopen(r,timeout=5).read()
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 30m
