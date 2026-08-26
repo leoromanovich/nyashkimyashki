@@ -1,3 +1,5 @@
 - Отвечай максимально плотно: минимум слов, максимум смысла.
 - Новые примеры compose/config/scripts для inference engines добавляй в этот репозиторий.
 - Каждый пример клади в отдельную папку с README и нужными compose/config/scripts рядом.
+- В новом или изменяемом `docker-compose.yaml` записывай длинный service `command` через `command: >-`: один флаг на строку, без backslash-продолжений. Длинный список `- --flag` запрещён.
+- Проверяй `docker compose config --quiet` и итоговый argv из `docker compose config --format json`; пробелы по краям argv запрещены.
