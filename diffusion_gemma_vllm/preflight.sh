@@ -69,11 +69,12 @@ gpu_name="${gpu_name# }"
 gpu_memory_mib="${gpu_memory_mib// /}"
 driver_version="${driver_version// /}"
 
-if [[ "$gpu_name" != *A100* ]]; then
-  printf 'GPU %s is outside this recipe contract; expected A100\n' "$gpu_name" >&2
+if [[ "$gpu_name" != *"${EXPECTED_GPU_NAME:-A100}"* ]]; then
+  printf 'GPU %s is outside this profile; expected name containing %s\n' \
+    "$gpu_name" "${EXPECTED_GPU_NAME:-A100}" >&2
   exit 2
 fi
-if (( gpu_memory_mib < 39000 )); then
+if (( gpu_memory_mib < ${MIN_GPU_MEMORY_MIB:-79000} )); then
   printf 'GPU memory is too small: %s MiB\n' "$gpu_memory_mib" >&2
   exit 2
 fi
@@ -94,12 +95,24 @@ if ! version_ge "$driver_version" "575.51.03"; then
   printf 'warning: driver %s uses CUDA forward compatibility\n' "$driver_version" >&2
 fi
 
-kv_bytes="$(python3 - "${KV_TRANSFER_CONFIG:?set KV_TRANSFER_CONFIG}" <<'PY'
+kv_bytes="$(python3 - "${KV_CPU_GIB:?set KV_CPU_GIB}" "${KV_TRANSFER_CONFIG:?set KV_TRANSFER_CONFIG}" <<'PY'
 import json
 import sys
 
-config = json.loads(sys.argv[1])
-print(int(config["kv_connector_extra_config"]["cpu_bytes_to_use"]))
+try:
+    gib = float(sys.argv[1])
+except ValueError as error:
+    raise SystemExit("KV_CPU_GIB must be a positive number") from error
+if gib <= 0:
+    raise SystemExit("KV_CPU_GIB must be a positive number")
+
+config = json.loads(sys.argv[2])
+extra = config.get("kv_connector_extra_config", {})
+if config.get("kv_connector") != "OffloadingConnector":
+    raise SystemExit("KV_TRANSFER_CONFIG must use OffloadingConnector")
+if extra.get("spec_name") != "TieringOffloadingSpec":
+    raise SystemExit("KV_TRANSFER_CONFIG must use TieringOffloadingSpec")
+print(int(gib * 1024**3))
 PY
 )"
 available_kib="$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
@@ -127,4 +140,4 @@ fi
 
 printf 'ok: %s, %s MiB, driver %s, model shards %s, RAM KV %s GiB, disk KV >= %s GiB free\n' \
   "$gpu_name" "$gpu_memory_mib" "$driver_version" \
-  "$model_shards" "$((kv_bytes / 1024 / 1024 / 1024))" "${KV_DISK_MIN_FREE_GB:-512}"
+  "$model_shards" "${KV_CPU_GIB}" "${KV_DISK_MIN_FREE_GB:-512}"
