@@ -1,0 +1,136 @@
+name: gemma4-a4b-vllm
+
+x-gemma-common: &gemma-common
+  image: ${VLLM_IMAGE:?set VLLM_IMAGE}
+  restart: unless-stopped
+  init: true
+  ipc: private
+  shm_size: "${VLLM_SHM_GIB:-144}gb"
+  stop_grace_period: 120s
+  entrypoint:
+    - /opt/gemma4/serve.sh
+  ports:
+    - "${VLLM_BIND_IP:-127.0.0.1}:${VLLM_PORT:-8000}:8000"
+  environment:
+    HF_HUB_DISABLE_TELEMETRY: "1"
+    HF_HUB_OFFLINE: "1"
+    NVIDIA_VISIBLE_DEVICES: ${GPU_DEVICE_ID:-0}
+    OPENAI_API_KEY: ${VLLM_API_KEY:?set VLLM_API_KEY}
+    PYTHONHASHSEED: "0"
+    TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
+    TRANSFORMERS_OFFLINE: "1"
+    VLLM_API_KEY: ${VLLM_API_KEY:?set VLLM_API_KEY}
+    VLLM_CACHE_ROOT: /cache/vllm
+    VLLM_ENABLE_CUDA_COMPATIBILITY: ${VLLM_ENABLE_CUDA_COMPATIBILITY:-1}
+    VLLM_USE_V2_MODEL_RUNNER: "1"
+    VLLM_SERVED_MODEL: ${VLLM_SERVED_MODEL:-gemma4-26b-a4b}
+  ulimits:
+    memlock:
+      soft: -1
+      hard: -1
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+  healthcheck:
+    test:
+      - CMD
+      - python3
+      - -c
+      - >-
+        import os,urllib.request;
+        r=urllib.request.Request('http://127.0.0.1:8000/v1/models',headers={'Authorization':'Bearer '+os.environ['VLLM_API_KEY']});
+        urllib.request.urlopen(r,timeout=5).read()
+    interval: 30s
+    timeout: 10s
+    retries: 20
+    start_period: 30m
+
+services:
+  gemma4:
+    <<: *gemma-common
+    container_name: gemma4-a4b-vllm
+    volumes:
+      - ${MODEL_DIR:?set MODEL_DIR}:/models:ro
+      - ${VLLM_CACHE_DIR:?set VLLM_CACHE_DIR}:/cache
+      - ${KV_CACHE_DIR:?set KV_CACHE_DIR}:/kv-cache
+      - ${BENCH_RESULTS_DIR:-./results}:/bench-results
+      - ./bench-serve-matrix.sh:/opt/gemma4/bench-serve-matrix.sh:ro
+      - ./serve.sh:/opt/gemma4/serve.sh:ro
+      - ./summarize-bench.py:/opt/gemma4/summarize-bench.py:ro
+    command: >-
+      --model /models
+      --served-model-name ${VLLM_SERVED_MODEL:-gemma4-26b-a4b}
+      --host 0.0.0.0
+      --port 8000
+      --dtype bfloat16
+      --tensor-parallel-size 1
+      --attention-backend TRITON_ATTN
+      --max-model-len ${MAX_MODEL_LEN:-131072}
+      --max-num-seqs ${MAX_NUM_SEQS:-24}
+      --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS:-8192}
+      --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION:-0.90}
+      --async-scheduling
+      --enable-prefix-caching
+      --enable-chunked-prefill
+      --kv-offloading-size ${KV_CPU_GIB:?set KV_CPU_GIB}
+      --kv-offloading-backend native
+      --kv-transfer-config '${KV_TRANSFER_CONFIG:?set KV_TRANSFER_CONFIG}'
+      --mm-processor-kwargs '{"max_soft_tokens":${MM_MAX_SOFT_TOKENS:-1120}}'
+      --limit-mm-per-prompt '{"image":${MAX_IMAGES_PER_PROMPT:-4},"video":0,"audio":0}'
+      --mm-processor-cache-gb ${MM_PROCESSOR_CACHE_GB:-4}
+      --enable-auto-tool-choice
+      --tool-call-parser gemma4
+      --chat-template /models/chat_template.jinja
+      --reasoning-parser gemma4
+      --default-chat-template-kwargs '{"enable_thinking":false}'
+      --generation-config vllm
+      --enable-prompt-tokens-details
+      --enable-request-id-headers
+
+  gemma4-mtp:
+    <<: *gemma-common
+    profiles: [mtp]
+    container_name: gemma4-a4b-vllm-mtp
+    volumes:
+      - ${MODEL_DIR:?set MODEL_DIR}:/models:ro
+      - ${ASSISTANT_MODEL_DIR:?set ASSISTANT_MODEL_DIR}:/assistant-model:ro
+      - ${VLLM_CACHE_DIR:?set VLLM_CACHE_DIR}:/cache
+      - ${KV_CACHE_DIR:?set KV_CACHE_DIR}:/kv-cache
+      - ${BENCH_RESULTS_DIR:-./results}:/bench-results
+      - ./bench-serve-matrix.sh:/opt/gemma4/bench-serve-matrix.sh:ro
+      - ./serve.sh:/opt/gemma4/serve.sh:ro
+      - ./summarize-bench.py:/opt/gemma4/summarize-bench.py:ro
+    command: >-
+      --model /models
+      --served-model-name ${VLLM_SERVED_MODEL:-gemma4-26b-a4b}
+      --host 0.0.0.0
+      --port 8000
+      --dtype bfloat16
+      --tensor-parallel-size 1
+      --attention-backend TRITON_ATTN
+      --max-model-len ${MAX_MODEL_LEN:-131072}
+      --max-num-seqs ${MAX_NUM_SEQS:-24}
+      --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS:-8192}
+      --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION:-0.90}
+      --async-scheduling
+      --enable-prefix-caching
+      --enable-chunked-prefill
+      --kv-offloading-size ${KV_CPU_GIB:?set KV_CPU_GIB}
+      --kv-offloading-backend native
+      --kv-transfer-config '${KV_TRANSFER_CONFIG:?set KV_TRANSFER_CONFIG}'
+      --mm-processor-kwargs '{"max_soft_tokens":${MM_MAX_SOFT_TOKENS:-1120}}'
+      --limit-mm-per-prompt '{"image":${MAX_IMAGES_PER_PROMPT:-4},"video":0,"audio":0}'
+      --mm-processor-cache-gb ${MM_PROCESSOR_CACHE_GB:-4}
+      --enable-auto-tool-choice
+      --tool-call-parser gemma4
+      --chat-template /models/chat_template.jinja
+      --reasoning-parser gemma4
+      --default-chat-template-kwargs '{"enable_thinking":false}'
+      --generation-config vllm
+      --enable-prompt-tokens-details
+      --enable-request-id-headers
+      --speculative-config '{"method":"mtp","model":"/assistant-model","num_speculative_tokens":${MTP_NUM_SPECULATIVE_TOKENS:-4}}'
