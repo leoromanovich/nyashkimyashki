@@ -62,6 +62,9 @@ GPU, driver, target checkpoint:
 docker compose --env-file .env config --quiet
 docker compose --env-file .env up -d gemma4
 docker compose --env-file .env logs -f gemma4
+set -a
+source .env
+set +a
 python3 smoke.py --structured --tool
 ```
 
@@ -109,6 +112,9 @@ MTP выделен в profile. Это сохраняет простой rollback
 docker compose --env-file .env stop gemma4
 docker compose --env-file .env --profile mtp up -d gemma4-mtp
 docker compose --env-file .env --profile mtp logs -f gemma4-mtp
+set -a
+source .env
+set +a
 python3 smoke.py --structured --tool
 ```
 
