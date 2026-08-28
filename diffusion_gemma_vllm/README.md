@@ -134,6 +134,13 @@ CPU-cache usage и NVMe writes через `/metrics`. Фиксированный
 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` запрещён: CUDA VMM может
 инвалидировать pinned KV pages OffloadingConnector.
 
+RAM tier vLLM 0.26 создаёт mmap `/dev/shm/vllm_offload_<engine>.mmap`.
+Аварийный engine exit может оставить этот файл. Compose использует private IPC:
+`VLLM_SHM_GIB=144` для A100 и `40` для RTX 4090. `serve.sh` очищает только
+`vllm_offload_*.mmap` внутри container namespace до старта и после остановки.
+Удаление контейнера освобождает private tmpfs после `SIGKILL`; host `/dev/shm`
+не монтируется. Persistent filesystem KV остаётся в `KV_CACHE_DIR`.
+
 ## Диагностика и откат
 
 В startup log ожидаются DiffusionGemma, compressed-tensors INT8 и Triton

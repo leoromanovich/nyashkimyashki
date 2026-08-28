@@ -5,9 +5,12 @@ services:
     image: ${VLLM_IMAGE:?set VLLM_IMAGE}
     container_name: diffusion-gemma-vllm
     restart: unless-stopped
-    ipc: host
-    shm_size: 32gb
+    init: true
+    ipc: private
+    shm_size: "${VLLM_SHM_GIB:?set VLLM_SHM_GIB}gb"
     stop_grace_period: 120s
+    entrypoint:
+      - /opt/diffusiongemma/serve.sh
     ports:
       - "${VLLM_BIND_IP:-127.0.0.1}:${VLLM_PORT:-8000}:8000"
     environment:
@@ -25,6 +28,7 @@ services:
       - ${MODEL_DIR:?set MODEL_DIR}:/models:ro
       - ${VLLM_CACHE_DIR:?set VLLM_CACHE_DIR}:/cache
       - ${KV_CACHE_DIR:?set KV_CACHE_DIR}:/kv-cache
+      - ./serve.sh:/opt/diffusiongemma/serve.sh:ro
     ulimits:
       memlock:
         soft: -1
