@@ -3,15 +3,19 @@ name: gemma4-a4b-vllm
 x-gemma-common: &gemma-common
   image: ${VLLM_IMAGE:?set VLLM_IMAGE}
   restart: unless-stopped
-  ipc: host
-  shm_size: 32gb
+  init: true
+  ipc: private
+  shm_size: "${VLLM_SHM_GIB:-144}gb"
   stop_grace_period: 120s
+  entrypoint:
+    - /opt/gemma4/serve.sh
   ports:
     - "${VLLM_BIND_IP:-127.0.0.1}:${VLLM_PORT:-8000}:8000"
   environment:
     HF_HUB_DISABLE_TELEMETRY: "1"
     HF_HUB_OFFLINE: "1"
     NVIDIA_VISIBLE_DEVICES: ${GPU_DEVICE_ID:-0}
+    OPENAI_API_KEY: ${VLLM_API_KEY:?set VLLM_API_KEY}
     PYTHONHASHSEED: "0"
     TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
     TRANSFORMERS_OFFLINE: "1"
@@ -19,6 +23,7 @@ x-gemma-common: &gemma-common
     VLLM_CACHE_ROOT: /cache/vllm
     VLLM_ENABLE_CUDA_COMPATIBILITY: ${VLLM_ENABLE_CUDA_COMPATIBILITY:-1}
     VLLM_USE_V2_MODEL_RUNNER: "1"
+    VLLM_SERVED_MODEL: ${VLLM_SERVED_MODEL:-gemma4-26b-a4b}
   ulimits:
     memlock:
       soft: -1
@@ -52,6 +57,10 @@ services:
       - ${MODEL_DIR:?set MODEL_DIR}:/models:ro
       - ${VLLM_CACHE_DIR:?set VLLM_CACHE_DIR}:/cache
       - ${KV_CACHE_DIR:?set KV_CACHE_DIR}:/kv-cache
+      - ${BENCH_RESULTS_DIR:-./results}:/bench-results
+      - ./bench-serve-matrix.sh:/opt/gemma4/bench-serve-matrix.sh:ro
+      - ./serve.sh:/opt/gemma4/serve.sh:ro
+      - ./summarize-bench.py:/opt/gemma4/summarize-bench.py:ro
     command: >-
       --model /models
       --served-model-name ${VLLM_SERVED_MODEL:-gemma4-26b-a4b}
@@ -60,7 +69,7 @@ services:
       --dtype bfloat16
       --tensor-parallel-size 1
       --attention-backend TRITON_ATTN
-      --max-model-len ${MAX_MODEL_LEN:-32768}
+      --max-model-len ${MAX_MODEL_LEN:-131072}
       --max-num-seqs ${MAX_NUM_SEQS:-24}
       --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS:-8192}
       --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION:-0.90}
@@ -91,6 +100,10 @@ services:
       - ${ASSISTANT_MODEL_DIR:?set ASSISTANT_MODEL_DIR}:/assistant-model:ro
       - ${VLLM_CACHE_DIR:?set VLLM_CACHE_DIR}:/cache
       - ${KV_CACHE_DIR:?set KV_CACHE_DIR}:/kv-cache
+      - ${BENCH_RESULTS_DIR:-./results}:/bench-results
+      - ./bench-serve-matrix.sh:/opt/gemma4/bench-serve-matrix.sh:ro
+      - ./serve.sh:/opt/gemma4/serve.sh:ro
+      - ./summarize-bench.py:/opt/gemma4/summarize-bench.py:ro
     command: >-
       --model /models
       --served-model-name ${VLLM_SERVED_MODEL:-gemma4-26b-a4b}
@@ -99,7 +112,7 @@ services:
       --dtype bfloat16
       --tensor-parallel-size 1
       --attention-backend TRITON_ATTN
-      --max-model-len ${MAX_MODEL_LEN:-32768}
+      --max-model-len ${MAX_MODEL_LEN:-131072}
       --max-num-seqs ${MAX_NUM_SEQS:-24}
       --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS:-8192}
       --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION:-0.90}

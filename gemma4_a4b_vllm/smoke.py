@@ -5,12 +5,15 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import json
 import mimetypes
 import os
+import struct
 import time
 import urllib.error
 import urllib.request
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -99,6 +102,34 @@ def image_data_url(path: Path) -> str:
     return f"data:{mime};base64,{encoded}"
 
 
+def control_image_data_url() -> str:
+    """Create a deterministic PNG: red left half and blue right half."""
+    width, height = 320, 160
+    red = bytes((229, 57, 53))
+    blue = bytes((30, 136, 229))
+    rows = [
+        b"\x00" + red * (width // 2) + blue * (width // 2)
+        for _ in range(height)
+    ]
+
+    def chunk(kind: bytes, payload: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(payload))
+            + kind
+            + payload
+            + struct.pack(">I", binascii.crc32(kind + payload) & 0xFFFFFFFF)
+        )
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", ihdr)
+        + chunk(b"IDAT", zlib.compress(b"".join(rows), level=9))
+        + chunk(b"IEND", b"")
+    )
+    return "data:image/png;base64," + base64.b64encode(png).decode()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -133,6 +164,61 @@ def main() -> int:
                 "first_seconds": round(first_s, 3),
                 "second_seconds": round(second_s, 3),
                 "second_cached_tokens": cached_tokens(second),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+    vision_schema = {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "vision_color_check",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "left": {
+                        "type": "string",
+                        "enum": ["red", "blue", "green", "yellow", "black", "white"],
+                    },
+                    "right": {
+                        "type": "string",
+                        "enum": ["red", "blue", "green", "yellow", "black", "white"],
+                    },
+                },
+                "required": ["left", "right"],
+                "additionalProperties": False,
+            },
+        },
+    }
+    control_content = [
+        {"type": "image_url", "image_url": {"url": control_image_data_url()}},
+        {
+            "type": "text",
+            "text": (
+                "Inspect the image. Return the dominant color of its left and right "
+                "halves. Use basic English color names from the response schema."
+            ),
+        },
+    ]
+    vision, vision_s = chat(
+        base_url,
+        args.api_key,
+        model,
+        control_content,
+        64,
+        response_format=vision_schema,
+    )
+    vision_result = json.loads(vision["choices"][0]["message"]["content"])
+    if vision_result != {"left": "red", "right": "blue"}:
+        raise RuntimeError(f"vision control mismatch: {vision_result}")
+    print(
+        json.dumps(
+            {
+                "vision_control_seconds": round(vision_s, 3),
+                "vision_control": vision_result,
+                "vision_control_passed": True,
             },
             ensure_ascii=False,
             indent=2,

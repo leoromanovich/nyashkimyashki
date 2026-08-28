@@ -8,13 +8,14 @@
 | Параметр | Default | Причина |
 | --- | ---: | --- |
 | Checkpoint | `google/gemma-4-26B-A4B-it`, BF16 | Native A100 Tensor Core path и quality control |
-| Context | 32768 | Баланс длинных документов и concurrent KV capacity |
+| Context | 131072 | Нативный 128K checkpoint contract |
 | Active sequences | 24 | Continuous batching для нескольких десятков пользователей |
 | Batched tokens | 8192 | Chunked prefill без монополизации scheduler длинным документом |
 | HBM fraction | 0.90 | Веса около 48 GiB плюс GPU KV и runtime buffers |
 | Images/request | 4 | Несколько страниц документа или screenshots |
 | Image budget | 1120 soft tokens | OCR и мелкий текст; снижайте до 280/560 для throughput |
 | RAM KV | 128 GiB | Pinned prefix tier |
+| Private `/dev/shm` | 144 GiB | RAM KV mmap плюс startup headroom |
 | NVMe floor | 512 GiB free | Filesystem tier startup gate |
 
 Модель содержит 25.2B total / 3.8B active parameters. Все веса находятся в
@@ -43,8 +44,8 @@ Download выполняется отдельно от runtime. Контейне�
 ```bash
 cd gemma4_a4b_vllm
 cp .env.example .env
-mkdir -p /data/vllm-cache /data/vllm-kv-cache
-chmod 700 /data/vllm-cache /data/vllm-kv-cache
+mkdir -p /data/vllm-cache /data/vllm-kv-cache results
+chmod 700 /data/vllm-cache /data/vllm-kv-cache results
 python3 -c 'import secrets; print(secrets.token_urlsafe(48))'
 ```
 
@@ -61,8 +62,12 @@ GPU, driver, target checkpoint:
 docker compose --env-file .env config --quiet
 docker compose --env-file .env up -d gemma4
 docker compose --env-file .env logs -f gemma4
-python3 smoke.py --structured --tool --image screenshot.png
+python3 smoke.py --structured --tool
 ```
+
+Smoke всегда отправляет сгенерированную PNG-картинку `red | blue` и принимает
+успех только при корректном structured vision-ответе. `--image screenshot.png`
+добавляет OCR/analysis реального изображения.
 
 Base service — production candidate. `async-scheduling`, chunked prefill и
 continuous batching оптимизируют aggregate throughput. Thinking выключен по
@@ -104,10 +109,10 @@ MTP выделен в profile. Это сохраняет простой rollback
 docker compose --env-file .env stop gemma4
 docker compose --env-file .env --profile mtp up -d gemma4-mtp
 docker compose --env-file .env --profile mtp logs -f gemma4-mtp
-python3 smoke.py --structured --tool --image screenshot.png
+python3 smoke.py --structured --tool
 ```
 
-Проверка throughput выполняется последовательно на одном GPU:
+Короткий прикладной A/B probe выполняется последовательно на одном GPU:
 
 ```bash
 # Base запущен, cache прогрет.
@@ -150,9 +155,49 @@ Filesystem tier vLLM не имеет capacity limit. Разместите `KV_CA
 p95/p99 latency, NVMe writes и external prefix hit rate. Очистка cache требует
 отдельного maintenance action при остановленном container.
 
+RAM tier vLLM 0.26 создаёт mmap `/dev/shm/vllm_offload_<engine>.mmap`. Рецепт
+использует container-private IPC и `VLLM_SHM_GIB=144`; аварийное удаление
+контейнера уничтожает private tmpfs. `serve.sh` удаляет scoped mmap перед
+стартом и после завершения engine. Host `/dev/shm` не монтируется. Файлы
+filesystem KV в `KV_CACHE_DIR` сохраняются между restart согласно cache policy.
+
 `PYTHONHASHSEED=0` стабилизирует block keys после restart. Не задавайте
 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`: CUDA VMM может нарушить
 pinned KV pages OffloadingConnector.
+
+## Полная матрица `vllm bench serve`
+
+При запущенном base service:
+
+```bash
+./run-bench-serve-matrix.sh .env base
+```
+
+Для MTP:
+
+```bash
+./run-bench-serve-matrix.sh .env mtp
+```
+
+Host wrapper вызывает `/opt/gemma4/bench-serve-matrix.sh` внутри работающего
+server container. Default grid содержит 15 cells:
+
+- concurrency: `2`, `4`, `8`, `16`, `32`;
+- input: `8192`, `16384`, `32768` tokens;
+- output: `1024` tokens с `ignore_eos`;
+- prompts/cell: `concurrency × 2`, один warmup.
+
+Каждый cell использует `/v1/completions`, infinite request rate и заданный
+`max-concurrency`. Это измеряет saturated aggregate throughput при точной
+synthetic token length. Результаты появляются в
+`BENCH_RESULTS_DIR/<mode>-<UTC timestamp>/`: raw JSON/log для каждого cell,
+`summary.json`, `summary.csv`. Любой request failure, отсутствующий cell или
+ненулевой `vllm bench serve` завершает matrix с exit 1.
+
+Один полный прогон измеряет `372 × 1024 = 380928` output tokens и добавляет
+15360 warmup tokens. Он может идти долго. Менять defaults можно через
+`BENCH_*` в `.env`; production comparison использует одинаковые значения для
+base и MTP.
 
 ## Проверка Compose argv
 
@@ -179,9 +224,11 @@ docker compose --env-file .env --profile mtp config --format json \
 - running/waiting requests, prompt/output throughput, GPU KV usage;
 - host `MemAvailable`, pinned memory и NVMe free/write latency.
 
-Начните с defaults. Для коротких chat prompts сравните `MAX_MODEL_LEN=16384` и
-`MAX_NUM_SEQS=32`. Для 64K документов установите `MAX_MODEL_LEN=65536`; ожидайте
-меньшую effective concurrency. Высокий vision budget увеличивает prefill cost.
+`MAX_MODEL_LEN=131072` объявляет доступный per-request context. Реальная
+одновременная длина ограничена GPU KV pool; scheduler применяет preemption при
+перегрузке. Для throughput tuning сохраняйте 131K contract и меняйте
+`MAX_NUM_SEQS`, `MAX_NUM_BATCHED_TOKENS`, admission limits gateway. Высокий
+vision budget увеличивает prefill cost.
 
 RAM gate требует `KV_CPU_GIB + 32 GiB` свободной памяти. Уменьшение RAM tier до
 64 GiB допустимо после проверки cache hit rate. NVMe помогает только повторным

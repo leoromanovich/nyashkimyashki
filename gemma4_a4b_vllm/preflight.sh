@@ -35,7 +35,7 @@ if [[ ! -d "$model_dir" || ! -r "$model_dir" ]]; then
   exit 2
 fi
 
-model_summary="$(python3 - "$model_dir" <<'PY'
+model_summary="$(python3 - "$model_dir" "${MAX_MODEL_LEN:?set MAX_MODEL_LEN}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -68,6 +68,15 @@ if config.get("quantization_config"):
     raise SystemExit("default A100 profile requires the unquantized BF16 checkpoint")
 if config.get("dtype") not in ("bfloat16", "bf16"):
     raise SystemExit("target model dtype must be bfloat16")
+try:
+    requested_context = int(sys.argv[2])
+except ValueError as error:
+    raise SystemExit("MAX_MODEL_LEN must be a positive integer") from error
+native_context = int(text.get("max_position_embeddings", 0))
+if requested_context < 1 or native_context < requested_context:
+    raise SystemExit(
+        f"requested context {requested_context} exceeds model context {native_context}"
+    )
 
 index = json.loads((root / "model.safetensors.index.json").read_text())
 shards = sorted(set(index.get("weight_map", {}).values()))
@@ -77,7 +86,10 @@ if not shards or missing_shards:
 weight_bytes = sum((root / name).stat().st_size for name in shards)
 if weight_bytes < 45 * 1024**3:
     raise SystemExit("target BF16 checkpoint is unexpectedly smaller than 45 GiB")
-print(f"{len(shards)} shards, {weight_bytes / 1024**3:.1f} GiB")
+print(
+    f"{len(shards)} shards, {weight_bytes / 1024**3:.1f} GiB, "
+    f"context={requested_context}/{native_context}"
+)
 PY
 )"
 
@@ -181,6 +193,20 @@ if secondary[0].get("root_dir") != "/kv-cache":
 print(int(gib * 1024**3))
 PY
 )"
+if [[ ! "${KV_CPU_GIB}" =~ ^[0-9]+$ ]]; then
+  printf 'KV_CPU_GIB must be a positive integer\n' >&2
+  exit 2
+fi
+if [[ ! "${VLLM_SHM_GIB:?set VLLM_SHM_GIB}" =~ ^[0-9]+$ ]]; then
+  printf 'VLLM_SHM_GIB must be a positive integer\n' >&2
+  exit 2
+fi
+minimum_shm_gib="$((KV_CPU_GIB + 16))"
+if (( VLLM_SHM_GIB < minimum_shm_gib )); then
+  printf 'private /dev/shm is too small: configured=%s GiB, required>=%s GiB\n' \
+    "$VLLM_SHM_GIB" "$minimum_shm_gib" >&2
+  exit 2
+fi
 available_kib="$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
 required_kib="$((kv_bytes / 1024 + 32 * 1024 * 1024))"
 if (( available_kib < required_kib )); then
@@ -196,6 +222,16 @@ for cache_dir in "${VLLM_CACHE_DIR:?set VLLM_CACHE_DIR}" "${KV_CACHE_DIR:?set KV
   fi
 done
 
+bench_results_dir="${BENCH_RESULTS_DIR:-$recipe_dir/results}"
+if [[ "$bench_results_dir" != /* ]]; then
+  bench_results_dir="$recipe_dir/${bench_results_dir#./}"
+fi
+if [[ ! -d "$bench_results_dir" || ! -w "$bench_results_dir" ]]; then
+  printf 'benchmark results directory must exist and be writable: %s\n' \
+    "$bench_results_dir" >&2
+  exit 2
+fi
+
 kv_disk_free_kib="$(df -Pk "$KV_CACHE_DIR" | awk 'NR == 2 {print $4}')"
 kv_disk_required_kib="$((${KV_DISK_MIN_FREE_GB:-512} * 1024 * 1024))"
 if (( kv_disk_free_kib < kv_disk_required_kib )); then
@@ -204,6 +240,7 @@ if (( kv_disk_free_kib < kv_disk_required_kib )); then
   exit 2
 fi
 
-printf 'ok: mode=%s, %s, %s MiB, driver %s, target=%s, assistant=%s, RAM KV=%s GiB, disk KV>=%s GiB\n' \
+printf 'ok: mode=%s, %s, %s MiB, driver %s, target=%s, assistant=%s, RAM KV=%s GiB, private shm=%s GiB, disk KV>=%s GiB\n' \
   "$mode" "$gpu_name" "$gpu_memory_mib" "$driver_version" "$model_summary" \
-  "$assistant_summary" "${KV_CPU_GIB}" "${KV_DISK_MIN_FREE_GB:-512}"
+  "$assistant_summary" "${KV_CPU_GIB}" "$VLLM_SHM_GIB" \
+  "${KV_DISK_MIN_FREE_GB:-512}"
