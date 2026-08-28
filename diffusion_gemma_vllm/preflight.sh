@@ -115,6 +115,20 @@ if extra.get("spec_name") != "TieringOffloadingSpec":
 print(int(gib * 1024**3))
 PY
 )"
+if [[ ! "${KV_CPU_GIB}" =~ ^[0-9]+$ ]]; then
+  printf 'KV_CPU_GIB must be a positive integer\n' >&2
+  exit 2
+fi
+if [[ ! "${VLLM_SHM_GIB:?set VLLM_SHM_GIB}" =~ ^[0-9]+$ ]]; then
+  printf 'VLLM_SHM_GIB must be a positive integer\n' >&2
+  exit 2
+fi
+minimum_shm_gib="$((KV_CPU_GIB + 16))"
+if (( VLLM_SHM_GIB < minimum_shm_gib )); then
+  printf 'private /dev/shm is too small: configured=%s GiB, required>=%s GiB\n' \
+    "$VLLM_SHM_GIB" "$minimum_shm_gib" >&2
+  exit 2
+fi
 available_kib="$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
 required_kib="$((kv_bytes / 1024 + 32 * 1024 * 1024))"
 if (( available_kib < required_kib )); then
@@ -138,6 +152,7 @@ if (( kv_disk_free_kib < kv_disk_required_kib )); then
   exit 2
 fi
 
-printf 'ok: %s, %s MiB, driver %s, model shards %s, RAM KV %s GiB, disk KV >= %s GiB free\n' \
+printf 'ok: %s, %s MiB, driver %s, model shards %s, RAM KV %s GiB, private shm %s GiB, disk KV >= %s GiB free\n' \
   "$gpu_name" "$gpu_memory_mib" "$driver_version" \
-  "$model_shards" "${KV_CPU_GIB}" "${KV_DISK_MIN_FREE_GB:-512}"
+  "$model_shards" "${KV_CPU_GIB}" "$VLLM_SHM_GIB" \
+  "${KV_DISK_MIN_FREE_GB:-512}"
