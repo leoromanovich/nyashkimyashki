@@ -143,13 +143,32 @@
         },
         "read": {
             "*": "allow",
-            "*.env": "deny",
-            "*.env.*": "deny",
+            "*.env": "ask",
+            "*.env.*": "ask",
             "*.env.example": "allow"
         },
         "glob": "allow",
         "grep": "allow",
-        "list": "allow",
         "lsp": "allow",
-        "skill": "allow"
+        "skill": "allow",
+        "webfetch": "allow",
+        "websearch": "allow"
+    },
+    "agent": {
+        "build": {
+            "permission": {
+                "question": "allow",
+                "todowrite": "allow",
+                "task": {
+                    "*": "ask",
+                    "explore": "allow"
+                },
+                "edit": "ask"
+            }
+        },
+        "general": {
+            "permission": {
+                "edit": "ask"
+            }
+        }
     }
