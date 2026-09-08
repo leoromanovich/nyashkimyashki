@@ -1,0 +1,13 @@
+{
+  "base_image": "vllm/vllm-openai:deepseekv4-flash-vision@sha256:65f80b25dfb7b6a419fa8054a5da22a35bec798ef82e625354d1f708448c9b6c",
+  "base_image_source_revision": null,
+  "vision_pr_reference": "047c353c99a6ab5f2ad09a70c3ccc6aa67deddfc",
+  "vllm_reviewed_main": "e41a17e606c9a8ffa639ebde5bce885667ff27ea",
+  "recipes_revision": "abacf57e353807216b2a7e0a740db5292af041a7",
+  "model": "deepseek-ai/DeepSeek-V4-Flash-Vision-Exp",
+  "model_revision": "6821d6ad3681a4b137b066b76094fa82ebd0a380",
+  "lmcache_revision": "21a5db10f1fc280fc7a5d59ce2660697669a0e1d",
+  "lmcache_archive_sha256": "5f0a3d8d9800453d1fb4b22f4e4cd0d8bcd71648fab711ebcd979ef94d59e2ea",
+  "lmcache_build_version": "0.5.4.dev20260908+21a5db10",
+  "verified_at": "2026-09-08"
+}
