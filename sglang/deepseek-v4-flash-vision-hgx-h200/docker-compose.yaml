@@ -1,0 +1,87 @@
+name: deepseek-v4-flash-vision-h200
+
+services:
+  sglang:
+    # Preview required for Vision; amd64 digest and source revision verified 2026-09-07.
+    image: lmsysorg/sglang:dev-dsv4-flash-vision@sha256:44a113290011bf87fcfeabc2ed94966bfc90f91b2dbe6239a69de3f35e686cba
+    platform: linux/amd64
+    restart: unless-stopped
+    stop_grace_period: 2m
+    ipc: host
+    cap_add:
+      - SYS_NICE
+    ports:
+      - "${BIND_IP:-127.0.0.1}:${PORT:-30000}:30000"
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+      OMP_NUM_THREADS: "${OMP_NUM_THREADS:-16}"
+      TRITON_CACHE_DIR: /cache/triton
+      TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
+      SGLANG_DG_CACHE_DIR: /cache/deepgemm
+      SGLANG_DSV4_REASONING_EFFORT: high
+      SGLANG_HICACHE_FILE_BACKEND_STORAGE_DIR: /hicache
+      SGLANG_HICACHE_FILE_BACKEND_MAX_SIZE: "${HICACHE_MAX_SIZE:-10T}"
+      SGLANG_HICACHE_FILE_BACKEND_MIN_FREE_SPACE: "${HICACHE_MIN_FREE_SPACE:-3T}"
+      SGLANG_HICACHE_FILE_BACKEND_EVICTION_RATIO: "0.9"
+    volumes:
+      - "${MODEL_CACHE_DIR:-/opt/models/huggingface}:/models"
+      - "${HICACHE_DIR:-/opt/sglang/hicache/dsv4-vision-6821d6a-40b3e15}:/hicache"
+      - kernel-cache:/cache
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    command: >-
+      python3 -m sglang.launch_server
+      --model-path deepseek-ai/DeepSeek-V4-Flash-Vision-Exp
+      --revision 6821d6ad3681a4b137b066b76094fa82ebd0a380
+      --download-dir /models
+      --served-model-name deepseek-v4-flash-vision
+      --host 0.0.0.0
+      --port 30000
+      --api-key "${SGLANG_API_KEY:?set SGLANG_API_KEY}"
+      --admin-api-key "${SGLANG_ADMIN_API_KEY:?set SGLANG_ADMIN_API_KEY}"
+      --trust-remote-code
+      --tp-size 8
+      --moe-runner-backend flashinfer_mxfp4
+      --disable-shared-experts-fusion
+      --context-length 200000
+      --reasoning-parser deepseek-v4
+      --tool-call-parser deepseekv4
+      --kv-cache-dtype fp8_e4m3
+      --page-size 256
+      --chunked-prefill-size ${CHUNKED_PREFILL_SIZE:-8192}
+      --max-running-requests ${MAX_RUNNING_REQUESTS:-128}
+      --max-queued-requests ${MAX_QUEUED_REQUESTS:-512}
+      --cuda-graph-max-bs-decode ${CUDA_GRAPH_MAX_BS:-128}
+      --schedule-policy fcfs
+      --mem-fraction-static ${MEM_FRACTION_STATIC:-0.85}
+      --enable-hierarchical-cache
+      --hicache-ratio ${HICACHE_RATIO:-1.25}
+      --hicache-io-backend direct
+      --hicache-mem-layout page_first_direct
+      --hicache-write-policy write_through_selective
+      --hicache-storage-backend file
+      --hicache-storage-prefetch-policy timeout
+      --enable-metrics
+      --enable-cache-report
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 8
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "--max-time", "20", "http://127.0.0.1:30000/health"]
+      interval: 30s
+      timeout: 25s
+      retries: 10
+      start_period: 30m
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+volumes:
+  kernel-cache:
