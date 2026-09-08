@@ -1,0 +1,122 @@
+name: deepseek-v4-vision-vllm-lmcache-h200
+
+x-runtime: &runtime
+  image: local/dsv4-vision-vllm-lmcache:65f80b25-21a5db10
+  build:
+    context: .
+    args:
+      MAX_JOBS: "${BUILD_MAX_JOBS:-4}"
+  platform: linux/amd64
+  entrypoint: []
+  network_mode: host
+  ipc: host
+  restart: unless-stopped
+  stop_grace_period: 2m
+  ulimits:
+    memlock: -1
+    stack: 67108864
+    nofile: 1048576
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 8
+            capabilities: [gpu]
+  logging:
+    driver: json-file
+    options:
+      max-size: "100m"
+      max-file: "5"
+
+services:
+  lmcache:
+    <<: *runtime
+    environment:
+      OMP_NUM_THREADS: "8"
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - "${LMCACHE_DISK_DIR:-/opt/lmcache/dsv4-vision-6821d6a-65f80b25-21a5db10}:/lmcache"
+    command: >-
+      lmcache server
+      --host 127.0.0.1
+      --port 5555
+      --http-host 127.0.0.1
+      --http-port 8081
+      --chunk-size 256
+      --max-gpu-workers 8
+      --max-cpu-workers 8
+      --l1-size-gb ${LMCACHE_RAM_GIB:-1024}
+      --eviction-policy LRU
+      --eviction-trigger-watermark 0.85
+      --eviction-ratio 0.1
+      --separate-object-groups
+      --l2-store-policy default
+      --l2-prefetch-policy retain
+      --l2-prefetch-max-in-flight 8
+      --l2-adapter '{"type":"nixl_store_dynamic","backend":"POSIX","backend_params":{"file_path":"/lmcache","use_direct_io":"false","max_capacity_gb":"${LMCACHE_DISK_GIB:-8192}","shard_dirs":"true"},"persist_enabled":true,"eviction":{"eviction_policy":"LRU","trigger_watermark":0.85,"eviction_ratio":0.1}}'
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "--max-time", "10", "http://127.0.0.1:8081/healthcheck"]
+      interval: 15s
+      timeout: 12s
+      retries: 10
+      start_period: 10m
+
+  vllm:
+    <<: *runtime
+    depends_on:
+      lmcache:
+        condition: service_healthy
+    environment:
+      VLLM_API_KEY: ${VLLM_API_KEY:?set VLLM_API_KEY}
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_HOME: /models
+      VLLM_CACHE_ROOT: /cache/vllm
+      TRITON_CACHE_DIR: /cache/triton
+      OMP_NUM_THREADS: "${OMP_NUM_THREADS:-8}"
+      PYTHONDONTWRITEBYTECODE: "1"
+      VLLM_NO_USAGE_STATS: "1"
+      DO_NOT_TRACK: "1"
+    volumes:
+      - "${MODEL_CACHE_DIR:-/opt/models/huggingface}:/models"
+      - kernel-cache:/cache
+    command: >-
+      vllm serve deepseek-ai/DeepSeek-V4-Flash-Vision-Exp
+      --revision 6821d6ad3681a4b137b066b76094fa82ebd0a380
+      --served-model-name deepseek-v4-flash-vision
+      --host ${BIND_IP:-127.0.0.1}
+      --port ${PORT:-30001}
+      --api-server-count 1
+      --trust-remote-code
+      --tensor-parallel-size 1
+      --data-parallel-size 8
+      --enable-expert-parallel
+      --all2all-backend ${ALL2ALL_BACKEND:-allgather_reducescatter}
+      --moe-backend marlin
+      --max-model-len 200000
+      --kv-cache-dtype fp8_ds_mla
+      --block-size 256
+      --enable-prefix-caching
+      --enable-chunked-prefill
+      --disable-chunked-mm-input
+      --max-num-seqs ${MAX_NUM_SEQS:-32}
+      --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS:-8192}
+      --max-num-queued-reqs ${MAX_INFLIGHT_REQUESTS:-512}
+      --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION:-0.88}
+      --compilation-config '{"cudagraph_mode":"FULL_DECODE_ONLY","max_cudagraph_capture_size":${CUDA_GRAPH_MAX_BS:-32}}'
+      --tokenizer-mode deepseek_v4
+      --reasoning-parser deepseek_v4
+      --tool-call-parser deepseek_v4
+      --enable-auto-tool-choice
+      --limit-mm-per-prompt '{"image":${MAX_IMAGES_PER_PROMPT:-8},"video":0}'
+      --kv-transfer-config '{"kv_connector":"LMCacheMPConnector","kv_role":"kv_both","kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_connector_extra_config":{"lmcache.mp.host":"tcp://127.0.0.1","lmcache.mp.port":5555,"lmcache.mp.eager_prefetch":true}}'
+      --disable-uvicorn-access-log
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "--max-time", "20", "--noproxy", "*", "http://${BIND_IP:-127.0.0.1}:${PORT:-30001}/health"]
+      interval: 30s
+      timeout: 25s
+      retries: 10
+      start_period: 30m
+
+volumes:
+  kernel-cache:

@@ -1,0 +1,5 @@
+*
+!Dockerfile
+!build_lmcache.py
+!image_check.py
+!versions.json
