@@ -1,4 +1,4 @@
-# Request tracing: OpenWebUI → LiteLLM → SMG → SGLang
+# Request tracing: OpenCode → OpenWebUI → LiteLLM → SMG → SGLang
 
 W3C `traceparent` / `tracestate` связывают spans одного запроса. Каждый сервис
 отправляет свои spans через OTLP в общий backend. Один общий адрес Collector
@@ -216,6 +216,86 @@ Batch exporters отправляют spans с задержкой; probe ждёт
 Фактическая проверка всей цепочки прошла в изолированных upstream контейнерах;
 подключение ваших существующих OpenWebUI/LiteLLM выполняется настройками выше.
 
+## OpenCode: воспроизводимая проверка
+
+`opencode_trace.py` упаковывает проверенный smoke test OpenCode **1.17.7**.
+Он создаёт root span `opencode.run` с `service.name=opencode-smoke` и передаёт
+новый W3C context в HTTP headers провайдера. Один запуск CLI получает один
+trace ID. Цикл с инструментами содержит несколько отдельных обращений к модели:
+
+```text
+opencode.run — запуск CLI целиком, включая старт процесса
+├── OpenWebUI → LiteLLM → SMG → SGLang: запрос на запись файла
+├── OpenWebUI → LiteLLM → SMG → SGLang: запрос на чтение файла
+└── OpenWebUI → LiteLLM → SMG → SGLang: финальный ответ
+```
+
+Root span добавляет тестовая обёртка. Внутренние tool operations и подготовка
+контекста OpenCode отдельных spans здесь не получают. `client_seconds`
+включает startup CLI и работу инструментов; это полное время тестового запуска.
+Для длительности inference выбирайте дочерние `sglang.generate`.
+
+Подготовка:
+
+1. Соберите/запустите SMG, SGLang, Collector и при необходимости Jaeger по
+   разделам выше. Docker images для добавления OpenCode probe пересобирать
+   не требуется: скрипт запускается на host.
+2. Настройте свои OpenWebUI и LiteLLM по соответствующим разделам. OpenWebUI
+   должен видеть модель `Qwen3.8-27B` через LiteLLM. Временные upstream containers
+   из наших экспериментов удалены; порт 18090 сам по себе сервис не создаёт.
+3. На Linux/POSIX host запуска нужны Python 3.9+, git и OpenCode 1.17.7. Python dependencies
+   входят в stdlib. OpenCode в serving images не устанавливается.
+4. Подготовьте OpenWebUI access token/API key с доступом к этой модели.
+   `--base-url` указывает API root OpenWebUI, например
+   `http://openwebui.example:8080/api`; SDK добавляет `/chat/completions`.
+
+В bash, из папки recipe на host с OpenCode:
+
+```bash
+opencode --version
+export OWUI_API_BASE='http://openwebui.example:8080/api'
+read -r -s -p 'OpenWebUI token: ' TRACE_API_KEY
+export TRACE_API_KEY
+python3 opencode_trace.py --base-url "$OWUI_API_BASE" --mode all
+unset TRACE_API_KEY
+```
+
+Замените адрес на свой. По умолчанию скрипт отправляет root span в
+`http://127.0.0.1:4318/v1/traces` и проверяет Jaeger на
+`http://127.0.0.1:16686`. Эти адреса относятся к host запуска OpenCode.
+Для удалённых Collector/UI задайте `--otlp-http-endpoint` и `--jaeger-url`.
+Первый параметр принимает полный OTLP/HTTP URL с `/v1/traces`. С внешним
+trace backend используйте `--no-verify`: ответы и экспорт root span проверяются,
+чтение Jaeger и проверка серверных spans пропускаются.
+
+`--mode all` запускает три проверки:
+
+| Mode | Проверка |
+| --- | --- |
+| `arithmetic` | Точный числовой ответ |
+| `json` | Валидный JSON с ожидаемыми полями |
+| `tools` | `write` → `read` одного временного файла → финальный ответ |
+
+Каждый mode можно запустить отдельно. `--opencode /path/to/opencode` выбирает
+binary; `--work-root /data/scratch` выбирает существующий родительский каталог
+временного окружения. `--timeout 120` ограничивает один запуск CLI.
+
+JSON-вывод содержит `passed`, `trace_id`, `jaeger_path`, число model requests,
+длительности и результат проверки parent chain. Exit code 0 означает, что все
+выбранные проверки прошли. Скрипт ждёт batch exporters до 30 s и проверяет
+наличие всех пяти сервисов среди предков каждого SGLang request span.
+В Jaeger выберите service `opencode-smoke` или откройте `/trace/<trace_id>`.
+Для тестовых запусков sampling включён через флаг `01` в `traceparent`.
+
+Скрипт использует `--pure`, явный `--dir`, отдельные XDG config/cache/data/state
+и абсолютный путь тестового файла. Все инструменты запрещены по умолчанию;
+для `tools` разрешены операции над `proof.txt`. Временное окружение, история
+OpenCode и файлы удаляются после прогона; постоянные настройки OpenCode сохраняются.
+Prompt/response и reasoning не пишутся в отчёт или root span. Проверка Jaeger
+дополнительно ищет запрещённые payload attributes и синтетические маркеры.
+Native OpenCode V2 и постоянная instrumentation произвольных CLI сессий в этот
+probe не входят.
+
 ## Sampling, стоимость и границы
 
 Для проверки используется 100% sampling. Для постоянной нагрузки задайте на
@@ -252,11 +332,19 @@ Nix app принимает `QWEN38_TRACING=1`, `QWEN38_TRACE_UI=1` и путь
 `QWEN38_CONFIG_DIR` к локальной копии recipe. Feature override:
 
 ```bash
-QWEN38_TRACING=1 QWEN38_TRACE_UI=1 ./cc feature qwen38-request-tracing run nyashkimyashki-qwen38-sglang-smg-control config --quiet
-QWEN38_TRACING=1 QWEN38_TRACE_UI=1 ./cc feature qwen38-request-tracing run nyashkimyashki-qwen38-sglang-smg-control trace-check --mode stream
+QWEN38_TRACING=1 QWEN38_TRACE_UI=1 ./cc feature qwen38-opencode-tracing-docs run nyashkimyashki-qwen38-sglang-smg-control config --quiet
+QWEN38_TRACING=1 QWEN38_TRACE_UI=1 ./cc feature qwen38-opencode-tracing-docs run nyashkimyashki-qwen38-sglang-smg-control trace-check --mode stream
 ```
 
-Операции: `build`, `up`, `logs`, `trace-config-check`, `trace-unit`, `trace-check`.
+OpenCode probe запускается на host Nix app. Задайте `TRACE_API_KEY` способом
+из раздела OpenCode перед вызовом:
+
+```bash
+./cc feature qwen38-opencode-tracing-docs run nyashkimyashki-qwen38-sglang-smg-control opencode-trace-check --base-url "$OWUI_API_BASE" --mode all
+```
+
+Операции: `build`, `up`, `logs`, `trace-config-check`, `trace-unit`, `trace-check`,
+`opencode-trace-check`. Последняя требует установленный OpenCode на host.
 Для remote Docker bind paths должны существовать на Docker host. В режиме Nix
 явные flags выбора overlays имеют приоритет над `COMPOSE_FILE` из `.env`.
 

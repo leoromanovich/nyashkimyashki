@@ -107,3 +107,31 @@ OpenWebUI 0.9.6 и LiteLLM 1.89.1. Существующие upstream deployments
 Это функциональные проверки. Накладные расходы tracing под нагрузкой и
 multi-GPU DPA здесь не измерялись. Jaeger хранит traces в RAM и теряет их
 при перезапуске. Инструкции и версия upstream integration: [TRACING.md](TRACING.md).
+
+
+## OpenCode probe — 2026-09-09
+
+Упакованный `opencode_trace.py` проверен на bx с OpenCode 1.17.7 через отдельные
+OpenWebUI 0.9.6 и LiteLLM 1.89.1, подключённые к тому же SMG/SGLang.
+
+| Сценарий | Результат | Inference requests |
+| --- | --- | ---: |
+| arithmetic | точный ответ | 1 |
+| json | ожидаемый JSON | 1 |
+| tools | write → read → финальный ответ; файл проверен | 3 |
+
+Во всех трёх traces подтверждены пять сервисов и полная цепочка предков каждого
+SGLang request. Проверены 708 spans: синтетические prompt markers и запрещённые
+payload attributes отсутствуют. После каждого прогона временный CLI state удалён.
+Root `opencode.run` измеряет полный запуск CLI, включая startup и инструменты.
+Внутренние операции OpenCode отдельных spans не получают.
+
+Первоначальный ручной тест показал, что одного subprocess cwd недостаточно:
+CLI выбрал домашнюю директорию. Probe всегда передаёт `--dir` и абсолютный путь;
+права инструментов ограничены тестовым `proof.txt`. Созданный при диагностике
+файл удалён. История OpenCode и временные upstream containers также удаляются.
+
+Локально проверены timeout с завершением CLI process group и очисткой state,
+экспорт metadata-only error span и обнаружение частичного отказа OTLP receiver.
+Compose argv/restart defaults и Nix feature checks прошли. Это функциональные
+smoke tests; overhead и качество модели под нагрузкой здесь не оцениваются.
