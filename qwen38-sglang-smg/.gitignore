@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+models/
+hicache*/
+runtime-cache/
+logs/
+results/
+__pycache__/
+# Local experiment archive; VALIDATION.md records the reproducible summary.
+RESEARCH.md
+evidence/
