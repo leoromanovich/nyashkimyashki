@@ -57,6 +57,8 @@ def validate(directory, env_file):
     required = {
         "--model-path": "deepseek-ai/DeepSeek-V4-Flash-Vision-Exp", "--revision": REVISION,
         "--tp-size": "8", "--context-length": "200000", "--page-size": "256",
+        "--dp-size": "8", "--enable-dp-attention": True, "--ep-size": "1",
+        "--moe-a2a-backend": "none", "--load-balance-method": "total_tokens",
         "--moe-runner-backend": "flashinfer_mxfp4", "--kv-cache-dtype": "fp8_e4m3",
         "--reasoning-parser": "deepseek-v4", "--tool-call-parser": "deepseekv4",
         "--disable-shared-experts-fusion": True, "--enable-hierarchical-cache": True,
@@ -67,16 +69,16 @@ def validate(directory, env_file):
     }
     for flag, value in required.items():
         assert args.get(flag) == value, "contract mismatch: " + flag
-    prohibited = {"--dp", "--dp-size", "--enable-dp-attention", "--ep-size",
-                  "--speculative-algorithm", "--hicache-size", "--disable-radix-cache",
+    prohibited = {"--speculative-algorithm", "--hicache-size", "--disable-radix-cache",
                   "--enable-prefill-cp", "--enable-dsa-prefill-context-parallel",
                   "--enable-deepseek-v4-fp4-indexer", "--quantization"}
-    # This contract fixes the TP8/DP1 baseline; other parallelism needs its own validation.
-    assert not prohibited.intersection(args), "flags outside the TP8/DP1 baseline contract"
-    assert 1 <= int(args["--max-running-requests"]) <= 256
-    assert 1 <= int(args["--max-queued-requests"]) <= 1024
-    assert 1 <= int(args["--cuda-graph-max-bs-decode"]) <= int(args["--max-running-requests"])
-    assert int(args["--chunked-prefill-size"]) in (4096, 8192, 16384)
+    assert not prohibited.intersection(args), "flags outside the DPA throughput contract"
+    dp = int(args["--dp-size"])
+    running = int(args["--max-running-requests"])
+    assert 64 <= running <= 512 and running % dp == 0, "running CLI budget must divide evenly across DP8"
+    assert 16 <= int(args["--max-queued-requests"]) <= 128, "queue limit is per DP rank"
+    assert 1 <= int(args["--cuda-graph-max-bs-decode"]) <= running // dp, "graph cap exceeds per-rank running budget"
+    assert int(args["--chunked-prefill-size"]) in (16384, 32768, 65536), "prefill CLI budget is divided by DP8"
     assert 0.70 <= float(args["--mem-fraction-static"]) <= 0.90
     assert 0 < float(args["--hicache-ratio"]) <= 1.5
     for flag in ("--api-key", "--admin-api-key"):
@@ -87,6 +89,7 @@ def validate(directory, env_file):
     for key in ("SGLANG_HICACHE_FILE_BACKEND_MAX_SIZE", "SGLANG_HICACHE_FILE_BACKEND_MIN_FREE_SPACE"):
         assert re.fullmatch(r"[1-9][0-9]*(?:[kMGT]|[kMGT]i)?", str(env[key])), "invalid file-cache size"
     assert service["deploy"]["resources"]["reservations"]["devices"][0]["count"] == 8
+    assert service["restart"] == "unless-stopped", "published recipe must retain its production restart policy"
     for script in directory.glob("*.py"):
         ast.parse(script.read_text(), filename=str(script))
     return config, args

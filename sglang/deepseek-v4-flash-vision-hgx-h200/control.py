@@ -59,6 +59,11 @@ def main():
     config, args = validate(ROOT, env_file)
     if ns.action == "config":
         print("OK: Compose schema and resolved argv; credentials omitted")
+        dp = int(args["--dp-size"])
+        print(f"TP8/DP8/DPA/EP1: running {args['--max-running-requests']} total / "
+              f"{int(args['--max-running-requests']) // dp} per rank; "
+              f"prefill {int(args['--chunked-prefill-size']) // dp} tokens per rank; "
+              f"queue {args['--max-queued-requests']} per rank")
         return
     if ns.action == "preflight":
         preflight(config, args)
