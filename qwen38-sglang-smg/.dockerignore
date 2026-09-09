@@ -1,0 +1,10 @@
+# Only image build inputs may enter the Docker context.
+**
+!Dockerfile.sglang
+!Dockerfile.smg
+!patch_servicer.py
+!serve.sh
+!download.sh
+!benchmark.py
+!inspect_cache.py
+!disconnect_probe.py
