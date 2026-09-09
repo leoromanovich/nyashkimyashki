@@ -17,7 +17,9 @@ MTP EAGLE 3/1/4 + ReplaySSM, HiCache RAM → SSD и cache-aware routing чере
 ## Трассировка запросов
 
 [TRACING.md](TRACING.md) — включение OTLP, локальный Jaeger и подключение
-OpenWebUI → LiteLLM → SMG → SGLang. Tracing включается отдельными Compose
+OpenCode → OpenWebUI → LiteLLM → SMG → SGLang. Включён host script
+`opencode_trace.py` для проверки CLI, инструментов и всей цепочки spans.
+Tracing включается отдельными Compose
 overlays; базовый запуск сохраняет только существующие `/metrics`.
 
 ## Требования
@@ -74,7 +76,8 @@ curl http://127.0.0.1:30000/v1/chat/completions \
 
 ## Проверки и управление
 
-Все scripts уже входят в image:
+Следующие проверки входят в image. OpenCode probe запускается отдельно на host
+по [инструкции tracing](TRACING.md#opencode-воспроизводимая-проверка):
 
 ```bash
 docker compose exec -T sglang python3 /opt/qwen38/benchmark.py --mode smoke
