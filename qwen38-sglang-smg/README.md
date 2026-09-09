@@ -14,6 +14,12 @@ MTP EAGLE 3/1/4 + ReplaySSM, HiCache RAM → SSD и cache-aware routing чере
 | Host HiCache | 64 decimal GB; измерено 1336256 KV tokens |
 | SSD cache | cap 48 GiB, watermark 0.9, оставить 20 GiB свободными |
 
+## Трассировка запросов
+
+[TRACING.md](TRACING.md) — включение OTLP, локальный Jaeger и подключение
+OpenWebUI → LiteLLM → SMG → SGLang. Tracing включается отдельными Compose
+overlays; базовый запуск сохраняет только существующие `/metrics`.
+
 ## Требования
 
 Linux x86_64, Docker Engine с Compose v2 и NVIDIA Container Toolkit.
@@ -146,5 +152,7 @@ allocations и admission. Параметры в `.env.example` относятс�
 
 Проверки, результаты и точные границы приведены в [VALIDATION.md](VALIDATION.md).
 `patch_servicer.py` исправляет переименованное поле prefill queue для GetLoads(all)
-и проверяет версии. При обновлении engine/bridge patch нужно пересмотреть.
+и подключает request tracing frontend к scheduler. `patch_smg.py` включает
+передачу W3C context в gRPC client. Оба patch проверяют версии/source anchors;
+при обновлении engine/gateway/bridge их нужно пересмотреть.
 `--tokenizer-path /model` также обязателен для этого bridge.

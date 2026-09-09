@@ -1,0 +1,11 @@
+# Merge these entries with your existing LiteLLM config.
+# Requires the OTel v2-capable LiteLLM version described in TRACING.md.
+model_list:
+  - model_name: Qwen3.8-27B
+    litellm_params:
+      model: openai/Qwen3.8-27B
+      api_base: http://192.168.0.59:30000/v1
+      api_key: unused
+litellm_settings:
+  callbacks:
+    - litellm_trace_headers.trace_headers
