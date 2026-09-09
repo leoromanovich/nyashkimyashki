@@ -25,7 +25,7 @@ services:
       SGLANG_HICACHE_FILE_BACKEND_EVICTION_RATIO: "0.9"
     volumes:
       - "${MODEL_CACHE_DIR:-/opt/models/huggingface}:/models"
-      - "${HICACHE_DIR:-/opt/sglang/hicache/dsv4-vision-6821d6a-40b3e15}:/hicache"
+      - "${HICACHE_DIR:-/opt/sglang/hicache/dsv4-vision-6821d6a-40b3e15-dpa8}:/hicache"
       - kernel-cache:/cache
     ulimits:
       memlock: -1
@@ -42,6 +42,11 @@ services:
       --admin-api-key "${SGLANG_ADMIN_API_KEY:?set SGLANG_ADMIN_API_KEY}"
       --trust-remote-code
       --tp-size 8
+      --dp-size 8
+      --enable-dp-attention
+      --ep-size 1
+      --moe-a2a-backend none
+      --load-balance-method total_tokens
       --moe-runner-backend flashinfer_mxfp4
       --disable-shared-experts-fusion
       --context-length 200000
@@ -49,10 +54,10 @@ services:
       --tool-call-parser deepseekv4
       --kv-cache-dtype fp8_e4m3
       --page-size 256
-      --chunked-prefill-size ${CHUNKED_PREFILL_SIZE:-8192}
-      --max-running-requests ${MAX_RUNNING_REQUESTS:-128}
-      --max-queued-requests ${MAX_QUEUED_REQUESTS:-512}
-      --cuda-graph-max-bs-decode ${CUDA_GRAPH_MAX_BS:-128}
+      --chunked-prefill-size ${CHUNKED_PREFILL_SIZE:-32768}
+      --max-running-requests ${MAX_RUNNING_REQUESTS:-256}
+      --max-queued-requests ${MAX_QUEUED_REQUESTS_PER_DP:-64}
+      --cuda-graph-max-bs-decode ${CUDA_GRAPH_MAX_BS:-32}
       --schedule-policy fcfs
       --mem-fraction-static ${MEM_FRACTION_STATIC:-0.85}
       --enable-hierarchical-cache

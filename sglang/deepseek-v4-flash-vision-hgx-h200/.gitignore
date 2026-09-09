@@ -3,3 +3,6 @@
 !.env.example
 __pycache__/
 *.pyc
+
+# Local experiments must not publish restart=no overrides.
+*.local.yaml

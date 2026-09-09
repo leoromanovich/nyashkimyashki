@@ -1,7 +1,7 @@
 # DeepSeek V4 Flash Vision — HGX 8×H200
 
-Стартовый профиль для **200 пользователей × 2 сессии**, контекста **200000**,
-**2 ТБ RAM / 17 ТБ SSD**. Статически проверен 2026-09-07. GPU smoke,
+DPA throughput-профиль для **200 пользователей × 2 сессии**, контекста **200000**,
+**2 ТБ RAM / 17 ТБ SSD**. Source/Compose проверены 2026-09-09. GPU smoke,
 восстановление Vision KV из RAM/SSD и нагрузочный прогон на HGX ещё требуются.
 
 ## Модель и версия
@@ -18,58 +18,77 @@
   и NVIDIA Container Toolkit. `ipc: host` использует host `/dev/shm`.
 
 Vision support находится в [PR #37253](https://github.com/sgl-project/sglang/pull/37253);
-на дату проверки latest release — v0.5.19, PR открыт. Cookbook требует preview.
+на 2026-09-07 latest release — v0.5.19, PR был открыт. Cookbook требует preview.
 Его H200 Vision balanced cell использует **TP4** и помечен `verified: false`.
-Здесь TP увеличен до **8** под имеющийся HGX; остальные serving/cache лимиты —
-обоснованный старт для измерений. Throughput и latency этого сочетания неизвестны.
+Основной профиль здесь — **TP8/DP8/DPA/EP1**, A2A `none`: восемь независимых
+attention/KV ranks, tensor-sharded experts. Pinned source содержит этот путь
+и синхронизацию Vision routing между ranks. Throughput и latency на HGX
+требуют измерений; DPA не требует DeepEP.
 
 ## Профиль
 
 | Параметр | Значение | Назначение |
 | --- | --- | --- |
-| Parallelism | TP8, DP1, EP1 | единый endpoint на всех GPU |
+| Parallelism | TP8, DP8, DPA, EP1, A2A none | независимые attention/KV ranks, TP experts |
 | Context | 200000 | общий бюджет prompt + reasoning + answer |
-| Running / queued | 128 / 512 | активная генерация и ограниченная очередь |
+| Running | 256 CLI → 32/rank | до 256 active суммарно, с учётом KV capacity |
+| Queued | 64/rank → до 512 суммарно | отдельная waiting queue каждого scheduler |
+| DP balancing | total_tokens | учитывает длину текущих и поступающих запросов |
 | Scheduler | FCFS | порядок поступления при общей нагрузке |
-| Chunked prefill | 8192 | ограничение длительности prefill шага |
+| Chunked prefill | 32768 CLI → 4096/rank | engine делит CLI budget на DP8 |
 | Static memory | 0.85 | запас для vision activations и runtime |
-| CUDA graphs decode | до batch 128 | соответствует admission cap |
+| CUDA graphs decode | до batch 32/rank | соответствует per-rank running cap |
 | KV | FP8, page 256 | DeepSeek V4 compressed attention |
 | RAM cache | ratio 1.25, direct/page_first_direct | повторное использование холодных префиксов |
-| SSD cache | file, 10T cap, 3T min free, LRU 0.9 | холодные истории между запросами |
+| SSD cache | file, 10T/index, 3T min free, LRU 0.9 | общая filesystem quota ≤12 TB обязательна |
 | Reasoning | high | default при контексте 200k |
 
 Контекст 200k включает выход. Практический клиентский бюджет:
 prompt ≤184000, `max_tokens=16000`; image/template tokens входят в prompt.
 Клиент должен сохранять историю и tool messages. KV cache может вытесняться.
 
-400 сессий могут порождать запросы с паузами. `max-running-requests=128` —
-верхняя граница scheduler; фактический batch ограничен доступными KV blocks.
-400 одновременных запросов заполнят running batch и очередь. При переполнении
-очереди SGLang возвращает HTTP 503; клиенту нужен bounded retry с jitter.
-400 уникальных историй по 200k — **80 млн токенов**. Их постоянное нахождение
-в HBM/RAM этим профилем не гарантируется. Общие префиксы уменьшают объём.
+400 сессий могут порождать запросы с паузами. `max-running-requests=256`
+делится на DP8: 32/rank, фактический batch ограничен KV blocks. Значение
+`max-queued-requests=64` применяется к каждому DP scheduler без деления:
+до 512 waiting на узле. Внешний gateway задаёт общий admission limit, если
+нужен жёсткий предел запросов на весь endpoint. Переполнение локальной
+очереди даёт HTTP 503; используйте bounded retry с jitter.
 
-В TP-only V4 MLA/KV пулы реплицируются по ranks. Нельзя складывать восемь
-одинаковых `max_total_num_tokens` как независимую ёмкость. Стартовый ratio 1.25
-выбран с запасом для 2 ТБ RAM: измерить суммарные `Allocating ... host memory`
-всех восьми ranks; целевой суммарный host KV ≤1.2–1.3 ТБ и MemAvailable ≥400 ГБ.
-При нехватке RAM уменьшать ratio, затем mem fraction. `--hicache-size`
-в этом image для V4 вызывает ValueError. `direct` здесь означает GPU↔RAM I/O;
-file backend использует обычный filesystem I/O.
+DPA распределяет уникальные контексты между attention ranks. В прежнем
+TP8/DP1 compressed KV реплицировался. Увеличение полезной KV capacity
+ограничивают также веса, vision activations и runtime buffers; восьмикратный
+выигрыш throughput обещать нельзя. 400 ×200k — 80 млн уникальных токенов:
+HBM/RAM residency и SLA такого workload подтверждаются benchmark.
 
-Под `/hicache` нужен отдельный каталог этой модели и версии; filesystem quota
-около 12 ТБ задаёт жёсткий предел. 10T — встроенный LRU cap; 3T — резерв
-свободного места filesystem. Контролировать bytes и inodes. Остаток SSD нужен
-для весов, Docker layers и служебных данных. При смене checkpoint, engine или
-KV layout использовать новый cache namespace. `unhealthy` требует реакции
-мониторинга: Docker restart policy сама по себе не перезапускает unhealthy.
+HiCache ratio 1.25 применяется к host pools каждого rank. Измерьте сумму
+`Allocating ... host memory` всех восьми ranks: целевой host KV ≤1.2–1.3 ТБ,
+MemAvailable ≥400 ГБ. При нехватке RAM уменьшайте ratio, затем mem fraction.
+`--hicache-size` для V4 в этом image вызывает ValueError.
+`direct` означает GPU↔RAM I/O; file backend использует buffered filesystem I/O.
+
+Под `/hicache` нужен новый namespace с суффиксом `-dpa8`. В DPA каждый worker
+получает storage `attn_tp_rank=0` и становится writer. Восемь процессов
+используют общий каталог с независимыми LRU indexes: `10T` ограничивает
+учёт одного evictor и не обеспечивает точный общий cap. Межпроцессной
+координации eviction нет. Atomic replace защищает целостность отдельной
+записи; cache misses при конкурирующем eviction допустимы.
+
+**Общая filesystem/project quota ≤12 ТБ обязательна.** `3T` min-free смотрит
+на весь filesystem, но конкурирующие проверки не являются общей резервацией.
+Контролируйте bytes/inodes и оставляйте место для весов и Docker layers.
+После смены checkpoint, engine или KV layout используйте новый namespace.
+Docker restart policy сама по себе не перезапускает `unhealthy` контейнер.
+
+Для agent sessions trusted gateway может назначать
+`X-Data-Parallel-Rank: SHA256(tenant + session) % 8` и удалять такой header
+из внешнего запроса. Это сохраняет GPU/RAM prefix locality. Без header
+работает `total_tokens`. Affinity может перегрузить отдельный rank; измеряйте
+очереди и TTFT по ranks. Общий SSD допускает reuse между ranks после backup.
 
 ## Отличия от GLM-5.2 NVFP4
 
 - Собственные parsers: `deepseek-v4` для reasoning, `deepseekv4` для tools.
-- Стартовый Hopper FP4 профиль использует TP8/DP1. DPA поддерживается отдельным
-  путём с TP для экспертов; ниже описан кандидат для A/B. Text-only
+- Hopper FP4 профиль использует TP8/DP8/DPA с TP для экспертов. Text-only
   `sgl-project/DeepSeek-V4-Flash-FP8` теряет требуемый Vision checkpoint.
 - Shared-expert fusion явно отключена; chunked prefill и prefix cache включены.
 - DSPARK выключен для стартового target-only профиля. Для отдельного A/B
@@ -83,25 +102,28 @@ Nix app: `nyashkimyashki-sglang-dsv4-vision-h200-control`.
 В локальной разработке source выбирается feature override:
 
 ```bash
-./cc feature deepseek-v4-flash-vision-h200 run nyashkimyashki-sglang-dsv4-vision-h200-control config
+./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control config
 ```
 
 Скопировать `.env.example` во внешний env-файл, задать два разных ключа,
 создать каталоги `MODEL_CACHE_DIR` и `HICACHE_DIR`, проверить quota и bind IP.
+При переходе со старого TP-only env перенесите новые defaults: running 256,
+chunk 32768, graph 32, `MAX_QUEUED_REQUESTS_PER_DP=64`, новый cache namespace.
+Старое имя `MAX_QUEUED_REQUESTS` больше не используется.
 По умолчанию endpoint доступен с localhost; `BIND_IP` должен быть адресом,
 доступным существующему gateway. Auth и health используют порт 30000.
 
 ```bash
 export DSV4_ENV_FILE=/absolute/path/dsv4-vision.env
-./cc feature deepseek-v4-flash-vision-h200 run nyashkimyashki-sglang-dsv4-vision-h200-control config
+./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control config
 
 # Явное разрешение runtime side effects на целевом HGX.
 export DSV4_CONFIRM=mutate-dsv4-vision-h200
-./cc feature deepseek-v4-flash-vision-h200 run nyashkimyashki-sglang-dsv4-vision-h200-control pull
-./cc feature deepseek-v4-flash-vision-h200 run nyashkimyashki-sglang-dsv4-vision-h200-control preflight
-./cc feature deepseek-v4-flash-vision-h200 run nyashkimyashki-sglang-dsv4-vision-h200-control up -d
-./cc feature deepseek-v4-flash-vision-h200 run nyashkimyashki-sglang-dsv4-vision-h200-control logs --tail 100 -f
-./cc feature deepseek-v4-flash-vision-h200 run nyashkimyashki-sglang-dsv4-vision-h200-control smoke
+./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control pull
+./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control preflight
+./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control up -d
+./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control logs --tail 100 -f
+./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control smoke
 ```
 
 Первый запуск скачивает pinned checkpoint в `/models` при доступе к Hugging Face.
@@ -111,43 +133,43 @@ Docker daemon и весов. Production launch в рамках подготов�
 `preflight` читает GPU/RAM/filesystem и проверяет уже скачанный image.
 `up` и `restart` повторяют preflight.
 
+Во время экспериментов отключайте restart через **локальный, игнорируемый Git**
+Compose override с `restart: "no"`. Перед публикацией проверьте штатный
+`unless-stopped`; основной `docker-compose.yaml` сохраняет его всегда.
+
 ## Приёмка на HGX
 
-1. Smoke: text, SSE, tool call → tool result → answer, red/blue/red images.
+1. Smoke: text, SSE, tool round trip, red/blue/red images на ranks 0/1/7,
+   concurrent text/image requests с idle peers на остальных ranks.
    Скрипт печатает только статусы; ответы и внутренние рассуждения не сохраняет.
 2. Отдельно проверить reasoning content с `reasoning_effort=high`, JSON/tool
    streaming, длинный многошаговый coding transcript, изображения после
    длинного текста, повтор одного изображения и смену изображения при том же тексте.
 3. Проверить 32k / 128k / ~184k prompt с запасом на 16k output; границу
-   200k и поведение превышения лимита. Затем нагрузку 32/64/128 активных
+   200k и поведение превышения лимита. Затем нагрузку 32/64/128/256 активных
    запросов, 400 сессий, cold и warm prefixes, реальную долю vision.
 4. Подтвердить RAM loadback, затем SSD loadback после вытеснения и restart:
    сравнить результаты с cold path и метрики `sglang:prefetched_tokens_total`,
    `sglang:backuped_tokens_total`, `usage.prompt_tokens_details.cached_tokens`.
    Простое наличие файлов не доказывает корректность восстановления.
 5. Измерить p50/p95/p99 TTFT и ITL, output tok/s на активный запрос, queue wait,
-   503, GPU/host memory и retractions. Только после этого повышать running и
-   graph cap совместно до 192/256, mem fraction до 0.88–0.90, chunk до 16384.
+   503, GPU/host memory и retractions по каждому DP rank. В `/get_server_info`
+   проверить `effective_max_running_requests_per_dp=32`, в startup log —
+   local chunk 4096. Сравнить running 128/256/512 → 16/32/64 на rank, graph
+   cap 16/32/64, chunk 16384/32768/65536 → 2048/4096/8192 на rank.
+   Значения увеличивать по p95 TTFT/ITL и доступному KV.
 
-## DPA для отдельного A/B
+## Границы поддержки
 
-Первый кандидат для нагрузки 400 сессий — **TP8/DP8/DPA, EP1, A2A none**
-с текущим `flashinfer_mxfp4`. В pinned image существует отдельный путь
-DPA + TP-MoE: gather перед экспертами, combine/scatter после, обработка image
-routing IDs соседних ranks. Каждый attention rank хранит KV своих запросов;
-эксперты остаются tensor-sharded. DPA не требует DeepEP. У SM90 MXFP4 runner
-в этом image зарегистрирован dispatch `none`; DeepEP для него не подключён.
+Основной Compose и validator требуют **TP8/DP8/DPA/EP1/A2A none**.
+`flashinfer_mxfp4` на SM90 зарегистрирован для dispatch `none`; добавление
+DeepEP к этому runner не обосновано его наличием в других V4 профилях.
+Pinned model source делает gather перед TP-MoE, combine/scatter после,
+обрабатывает global image routing IDs, text-only и idle batches.
 
-Комбинация **H200 + Vision + DPA + HiCache** требует GPU-прогона. Compose и
-`validate.py` фиксируют исходный TP8/DP1 профиль; переход на DPA требует
-согласованного изменения конфигурации и её контракта. Перед A/B пересчитать
-per-rank prefill/concurrency, host cache budgets и лимиты SSD для всех writers;
-проверить text/image/idle mix, L2/L3 loadback и sticky routing по сессии.
-Пометка Hopper FP4 «TP-only» в cookbook не доказывает запрет DPA.
-
-Дополнительный A/B — **2 независимые TP4 реплики** со sticky routing и
-раздельными cache namespaces. Эффект на ёмкость KV, p95 и throughput измерить.
-Для hard SLA на 400 одновременно генерирующих длинных запросов нужен benchmark.
+Полное сочетание H200 + Vision + DPA + HiCache ещё требует GPU-прогона.
+TP-only можно держать локальным профилем сравнения. Основной публикуемый
+recipe соответствует многопользовательской throughput задаче.
 
 ## Evidence
 
@@ -161,3 +183,6 @@ per-rank prefill/concurrency, host cache budgets и лимиты SSD для вс
 - [Pinned V4 host-pool assembly](https://github.com/sgl-project/sglang/blob/40b3e15ddbd9a1067e181283d9900dd3f4d76ed7/python/sglang/srt/mem_cache/hybrid_cache/hybrid_pool_assembler.py)
 - [Pinned V4 L2/L3 tests](https://github.com/sgl-project/sglang/blob/40b3e15ddbd9a1067e181283d9900dd3f4d76ed7/test/registered/radix_cache/unified_radix_tree/test_unified_radix_cache_kl_dsv4.py)
 - [Image metadata](https://hub.docker.com/v2/repositories/lmsysorg/sglang/tags/dev-dsv4-flash-vision)
+
+- [Pinned DPA prefill normalization](https://github.com/sgl-project/sglang/blob/40b3e15ddbd9a1067e181283d9900dd3f4d76ed7/python/sglang/srt/arg_groups/parallel_hook.py#L190)
+- [Pinned per-worker running limit](https://github.com/sgl-project/sglang/blob/40b3e15ddbd9a1067e181283d9900dd3f4d76ed7/python/sglang/srt/mem_cache/kv_cache_configurator.py#L1949)
