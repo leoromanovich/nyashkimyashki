@@ -75,3 +75,35 @@ inspect_cache.py и disconnect_probe.py; модельные тексты не с
 GPU worker для проверки упаковки не пересоздавался: параметры serving сохранены,
 проверены новые image build и упакованные команды. Сырые журналы и полный
 исследовательский отчёт остаются в локальном архиве.
+
+
+## Сквозная request tracing — 2026-09-09
+
+На bx пересозданы SMG/SGLang с tracing patches, включены Collector Contrib
+0.160.0 и Jaeger 2.20.0. Для проверки полной цепочки подняты отдельные
+OpenWebUI 0.9.6 и LiteLLM 1.89.1. Существующие upstream deployments не менялись.
+
+- Streaming и nonstream: один trace ID и полная цепочка CHILD_OF через
+  OpenWebUI → LiteLLM → SMG → `sglang.generate` → scheduler. Проверены
+  prefill/decode spans и HTTP span, охватывающий время генерации.
+- Streaming cancel через все четыре сервиса: SGLang root завершился с
+  `error.type=Cancelled`, scheduler spans закрылись, очереди освободились.
+- Входящий sampling flag `00` соблюдается всей цепочкой; после ожидания
+  batch exporters соответствующая трасса отсутствует в Jaeger.
+- Прямой запрос без `traceparent` создаёт SMG root с дочерними SGLang spans.
+- При отдельно остановленных Jaeger и Collector генерация завершается.
+  После запуска Collector экспорт восстанавливается.
+- Проверка трёх полных трасс, 113 spans: тестовый prompt, message payloads,
+  Authorization, SQL statements и exception text отсутствуют в проверенных
+  атрибутах. Collector применяет явный metadata allowlist.
+- Четыре unit tests с настоящим SGLang/OTel SDK: W3C parent/tracestate,
+  pickle handoff, независимые contexts, отмена, idempotent finish и disabled init.
+- Native GetLoads(all): GPU KV 247360 tokens, max_running 8, очереди пусты.
+  Параметры весов, KV/GDN, MTP и HiCache сохранены.
+- Оба Docker images собраны. Collector config validation и все три Compose
+  комбинации прошли; argv разделены корректно. Published restart default —
+  `unless-stopped`, локальные экспериментальные контейнеры — `no`.
+
+Это функциональные проверки. Накладные расходы tracing под нагрузкой и
+multi-GPU DPA здесь не измерялись. Jaeger хранит traces в RAM и теряет их
+при перезапуске. Инструкции и версия upstream integration: [TRACING.md](TRACING.md).

@@ -8,3 +8,8 @@
 !benchmark.py
 !inspect_cache.py
 !disconnect_probe.py
+!tracing_bridge.py
+!smg-launch.sh
+!trace_probe.py
+!test_tracing.py
+!patch_smg.py

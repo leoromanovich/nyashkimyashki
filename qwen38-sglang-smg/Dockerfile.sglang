@@ -1,6 +1,6 @@
 ARG SGLANG_IMAGE=lmsysorg/sglang:v0.5.19@sha256:d6e7288627be8b02be88e4bba38e73f6d50e2826869f753c13a4c4385ab3eda9
 FROM ${SGLANG_IMAGE}
 RUN python3 -m pip install --no-cache-dir smg-grpc-servicer==0.9.1 smg-grpc-proto==0.4.16
-COPY patch_servicer.py /opt/qwen38/patch_servicer.py
+COPY patch_servicer.py tracing_bridge.py /opt/qwen38/
 RUN python3 /opt/qwen38/patch_servicer.py
-COPY serve.sh download.sh benchmark.py inspect_cache.py disconnect_probe.py /opt/qwen38/
+COPY serve.sh download.sh benchmark.py inspect_cache.py disconnect_probe.py trace_probe.py test_tracing.py /opt/qwen38/

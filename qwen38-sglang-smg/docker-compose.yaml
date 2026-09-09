@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile.sglang
       args:
         SGLANG_IMAGE: ${SGLANG_IMAGE:-lmsysorg/sglang:v0.5.19@sha256:d6e7288627be8b02be88e4bba38e73f6d50e2826869f753c13a4c4385ab3eda9}
-    image: &sglang-image ${SGLANG_RUNTIME_IMAGE:-local/qwen38-sglang:0.5.19-smg0.9.1}
+    image: &sglang-image ${SGLANG_RUNTIME_IMAGE:-local/qwen38-sglang:0.5.19-smg0.9.1-tracing1}
     init: true
     restart: ${RESTART_POLICY:-unless-stopped}
     shm_size: 16gb
@@ -21,6 +21,10 @@ services:
               device_ids: ["${GPU_ID:-0}"]
               capabilities: [gpu]
     environment:
+      ENABLE_TRACING: ${ENABLE_TRACING:-0}
+      OTLP_TRACES_ENDPOINT: ${OTLP_TRACES_ENDPOINT:-otel-collector:4317}
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      SGLANG_TRACE_LEVEL: ${SGLANG_TRACE_LEVEL:-1}
       HF_HUB_OFFLINE: "1"
       ENABLE_MTP: ${ENABLE_MTP:-1}
       MTP_REPLAY_SSM: ${MTP_REPLAY_SSM:-1}
@@ -80,13 +84,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.smg
-    image: ${SMG_RUNTIME_IMAGE:-local/qwen38-smg:1.10.1}
+    image: ${SMG_RUNTIME_IMAGE:-local/qwen38-smg:1.10.1-tracing2}
     init: true
     restart: ${RESTART_POLICY:-unless-stopped}
     depends_on:
       sglang:
         condition: service_healthy
     environment:
+      ENABLE_TRACING: ${ENABLE_TRACING:-0}
+      OTLP_TRACES_ENDPOINT: ${OTLP_TRACES_ENDPOINT:-otel-collector:4317}
+      OTEL_TRACES_SAMPLER: parentbased_always_on
       RUST_LOG: info,smg::policies::cache_aware=debug,smg::worker::kv_event_monitor=debug
       HF_HUB_OFFLINE: "1"
     volumes:

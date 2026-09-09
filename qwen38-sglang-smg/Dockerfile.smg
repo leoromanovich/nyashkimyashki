@@ -1,3 +1,26 @@
+# SMG 1.10.1 defines OtelTraceInjector but leaves the gRPC client on NoopTraceInjector.
+# Rebuild the pinned release with one factory fix; Python CLI stays unchanged.
+FROM rust:1.98.0-bookworm AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-venv clang libclang-dev libssl-dev pkg-config protobuf-compiler libprotobuf-dev cmake \
+    && rm -rf /var/lib/apt/lists/*
+RUN python3 -m venv /build-venv && /build-venv/bin/pip install --no-cache-dir maturin==1.9.6
+WORKDIR /src
+RUN git clone --depth 1 --branch v1.10.1 https://github.com/smg-project/smg.git . \
+    && test "$(git rev-parse HEAD)" = 2f945936b5be75d1a8bbb8a7dbb2f6585ac76e8e
+COPY patch_smg.py /tmp/patch_smg.py
+RUN python3 /tmp/patch_smg.py
+ARG CARGO_BUILD_JOBS=8
+ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/src/target \
+    /build-venv/bin/maturin build --locked --profile ci \
+      --manifest-path bindings/python/Cargo.toml --interpreter /build-venv/bin/python \
+      --compatibility linux --out /wheels
+
 FROM python:3.12-slim
-RUN pip install --no-cache-dir smg==1.10.1
-ENTRYPOINT ["smg"]
+COPY --from=builder /wheels /tmp/wheels
+RUN pip install --no-cache-dir /tmp/wheels/*.whl && rm -rf /tmp/wheels \
+    && python3 -c 'from smg import smg_rs'
+COPY smg-launch.sh /opt/qwen38/smg-launch.sh
+ENTRYPOINT ["sh", "/opt/qwen38/smg-launch.sh"]
