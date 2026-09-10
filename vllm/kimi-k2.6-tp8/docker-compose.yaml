@@ -1,0 +1,140 @@
+name: kimi-k2.6-tp8
+services:
+  vllm:
+    image: vllm/vllm-openai:v0.22.1-x86_64-cu129-ubuntu2404
+    restart: ${RESTART_POLICY:-unless-stopped}
+    stop_grace_period: 1m
+    ipc: host
+    shm_size: 32gb
+    cap_add:
+    - SYS_NICE
+    ports:
+    - 127.0.0.1:${ENGINE_PORT:-30001}:30000
+    environment:
+      HF_HOME: /cache/huggingface
+      HF_HUB_CACHE: /cache/huggingface/hub
+      VLLM_CACHE_ROOT: /cache/vllm
+      VLLM_CONFIG_ROOT: /cache/vllm-config
+      TRITON_CACHE_DIR: /cache/triton
+      TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
+      OMP_NUM_THREADS: '32'
+      TOKENIZERS_PARALLELISM: 'false'
+      NCCL_NVLS_ENABLE: '1'
+      NCCL_CUMEM_ENABLE: '1'
+      VLLM_API_KEY: ${VLLM_API_KEY:?set VLLM_API_KEY}
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      OTEL_SERVICE_NAME: vllm
+      OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: grpc
+      OTEL_BSP_MAX_QUEUE_SIZE: '2048'
+      OTEL_BSP_MAX_EXPORT_BATCH_SIZE: '256'
+      OTEL_BSP_SCHEDULE_DELAY: '1000'
+      OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: 'false'
+    volumes:
+    - /models:/models
+    - ./logs:/logs
+    - ./cache/huggingface:/cache/huggingface
+    - ./cache/vllm:/cache/vllm
+    - ./cache/vllm-config:/cache/vllm-config
+    - ./cache/torchinductor:/cache/torchinductor
+    - ./cache/triton:/cache/triton
+    - ./cache/filecache:/cache/filecache
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    entrypoint:
+    - vllm
+    - serve
+    command: >-
+      /models/moonshotai/Kimi-K2.6
+      --served-model-name kimi
+      --host 0.0.0.0
+      --port 30000
+      --api-key '${VLLM_API_KEY:?set VLLM_API_KEY}'
+      --trust-remote-code
+      --reasoning-parser kimi_k2
+      --tool-call-parser kimi_k2
+      --enable-auto-tool-choice
+      --max-model-len 202752
+      --kv-cache-dtype fp8
+      --block-size 64
+      --gpu-memory-utilization 0.88
+      --tensor-parallel-size 8
+      --decode-context-parallel-size 8
+      --mm-encoder-tp-mode data
+      --attention-config.use_trtllm_ragged_deepseek_prefill=True
+      --enable-prefix-caching
+      --enable-chunked-prefill
+      --max-num-batched-tokens 65536
+      --max-num-seqs 128
+      --max-num-partial-prefills 4
+      --max-long-partial-prefills 1
+      --long-prefill-token-threshold 8192
+      --max-cudagraph-capture-size 16
+      --max-parallel-loading-workers 8
+      --renderer-num-workers 8
+      --kv-cache-metrics
+      --disable-log-stats
+      --disable-access-log-for-endpoints /health,/metrics,/ping
+      --speculative-config '{"model":"/models/lightseekorg/kimi-k2.6-eagle3-mla","method":"eagle3","num_speculative_tokens":3}'
+      --disable-log-requests
+      --otlp-traces-endpoint otel-collector:4317
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: all
+            capabilities:
+            - gpu
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://127.0.0.1:30000/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 1200s
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: '5'
+    depends_on:
+      otel-collector:
+        condition: service_started
+  smg:
+    extends:
+      file: ../../misc/telemetry/compose.services.yaml
+      service: smg
+    command: >-
+      --host 0.0.0.0
+      --port 30000
+      --worker-urls 'http://${SMG_WORKER_SERVICE:-vllm}:30000'
+      --backend vllm
+      --policy cache_aware
+      --api-key '${VLLM_API_KEY:?set VLLM_API_KEY}'
+      --history-backend none
+      --enable-trace
+      --otlp-traces-endpoint otel-collector:4317
+      --prometheus-host 0.0.0.0
+      --prometheus-port 29000
+      --health-check-endpoint /health
+      --worker-startup-timeout-secs 1800
+      --request-timeout-secs 1800
+    depends_on:
+      otel-collector:
+        condition: service_started
+    ports:
+    - ${SMG_BIND:-127.0.0.1}:${SMG_PORT:-30000}:30000
+    - 127.0.0.1:${SMG_METRICS_PORT:-29000}:29000
+    restart: ${RESTART_POLICY:-unless-stopped}
+  otel-collector:
+    extends:
+      file: ../../misc/telemetry/compose.services.yaml
+      service: otel-collector
+    environment:
+      OTLP_UPSTREAM_ENDPOINT: ${OTLP_UPSTREAM_ENDPOINT:?set external OTLP gRPC endpoint}
+      OTLP_UPSTREAM_INSECURE: ${OTLP_UPSTREAM_INSECURE:-false}
+      TELEMETRY_RECIPE: kimi-k2.6-tp8
+      TELEMETRY_ENVIRONMENT: ${TELEMETRY_ENVIRONMENT:-production}
+    restart: ${RESTART_POLICY:-unless-stopped}

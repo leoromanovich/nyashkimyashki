@@ -1,0 +1,123 @@
+name: kimi-k2.6-dep8-eagle3
+services:
+  vllm-kimi-k26:
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:v0.22.1}
+    volumes:
+    - /models:/models
+    - ${HF_CACHE:-${HOME}/.cache/huggingface}:/root/.cache/huggingface
+    restart: ${RESTART_POLICY:-unless-stopped}
+    network_mode: host
+    privileged: true
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+      HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN:-}
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-16}
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      OTEL_SERVICE_NAME: vllm
+      OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: grpc
+      OTEL_BSP_MAX_QUEUE_SIZE: '2048'
+      OTEL_BSP_MAX_EXPORT_BATCH_SIZE: '256'
+      OTEL_BSP_SCHEDULE_DELAY: '1000'
+      OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: 'false'
+      VLLM_API_KEY: ${VLLM_API_KEY:?set VLLM_API_KEY}
+      ENGINE_PORT: ${ENGINE_PORT:-30001}
+    command: >-
+      /models/moonshotai/Kimi-K2.6
+      --served-model-name=kimi-k2.6
+      --trust-remote-code
+      --language-model-only
+      --tensor-parallel-size=1
+      --data-parallel-size=8
+      --enable-expert-parallel
+      --reasoning-parser=kimi_k2
+      --tool-call-parser=kimi_k2
+      --enable-auto-tool-choice
+      --max-model-len=262144
+      --kv-cache-dtype=fp8_e4m3
+      '--kv-offloading-size=${VLLM_KV_OFFLOADING_SIZE_PER_DP:-100}'
+      --kv-offloading-backend=native
+      --max-num-batched-tokens=32768
+      '--max-num-seqs=${VLLM_MAX_NUM_SEQS_PER_DP:-12}'
+      --gpu-memory-utilization=0.85
+      --enable-prefix-caching
+      '--speculative-config={"model":"/models/lightseekorg/kimi-k2.6-eagle3-mla","method":"eagle3","num_speculative_tokens":3}'
+      --distributed-executor-backend=mp
+      --enable-server-load-tracking
+      --enable-prompt-tokens-details
+      --disable-uvicorn-access-log
+      --host=127.0.0.1
+      '--port=${ENGINE_PORT:-30001}'
+      --disable-log-requests
+      --otlp-traces-endpoint '127.0.0.1:${COLLECTOR_GRPC_PORT:-14317}'
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    ipc: host
+    shm_size: 64g
+    healthcheck:
+      test:
+      - CMD
+      - python3
+      - -c
+      - import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ['ENGINE_PORT']+'/health',timeout=10)
+      interval: 30s
+      timeout: 10s
+      retries: 120
+      start_period: 900s
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 8
+            capabilities:
+            - gpu
+    depends_on:
+      otel-collector:
+        condition: service_started
+  smg:
+    extends:
+      file: ../../misc/telemetry/compose.services.yaml
+      service: smg
+    command: >-
+      --host '${SMG_BIND:-127.0.0.1}'
+      --port '${SMG_PORT:-30000}'
+      --worker-urls 'http://127.0.0.1:${ENGINE_PORT:-30001}'
+      --backend vllm
+      --policy cache_aware
+      --api-key '${VLLM_API_KEY:?set VLLM_API_KEY}'
+      --history-backend none
+      --enable-trace
+      --otlp-traces-endpoint '127.0.0.1:${COLLECTOR_GRPC_PORT:-14317}'
+      --prometheus-host 127.0.0.1
+      --prometheus-port '${SMG_METRICS_PORT:-29000}'
+      --health-check-endpoint /health
+      --worker-startup-timeout-secs 1800
+      --request-timeout-secs 1800
+    depends_on:
+      otel-collector:
+        condition: service_started
+    network_mode: host
+    environment:
+      SMG_PORT: ${SMG_PORT:-30000}
+    healthcheck:
+      test:
+      - CMD
+      - python3
+      - -c
+      - import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ['SMG_PORT']+'/readiness',timeout=5)
+    restart: ${RESTART_POLICY:-unless-stopped}
+  otel-collector:
+    extends:
+      file: ../../misc/telemetry/compose.services.yaml
+      service: otel-collector
+    environment:
+      OTLP_UPSTREAM_ENDPOINT: ${OTLP_UPSTREAM_ENDPOINT:?set external OTLP gRPC endpoint}
+      OTLP_UPSTREAM_INSECURE: ${OTLP_UPSTREAM_INSECURE:-false}
+      TELEMETRY_RECIPE: kimi-k2.6-dep8-eagle3
+      TELEMETRY_ENVIRONMENT: ${TELEMETRY_ENVIRONMENT:-production}
+      OTLP_RECEIVER_HOST: 127.0.0.1
+      OTLP_RECEIVER_GRPC_PORT: ${COLLECTOR_GRPC_PORT:-14317}
+      OTLP_RECEIVER_HTTP_PORT: ${COLLECTOR_HTTP_PORT:-14318}
+    network_mode: host
+    restart: ${RESTART_POLICY:-unless-stopped}

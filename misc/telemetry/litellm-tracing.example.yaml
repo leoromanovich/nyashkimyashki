@@ -1,0 +1,10 @@
+# Merge into the existing LiteLLM config; set these env vars on LiteLLM.
+model_list:
+  - model_name: inference-model
+    litellm_params:
+      model: os.environ/LITELLM_UPSTREAM_MODEL
+      api_base: os.environ/INFERENCE_API_BASE
+      api_key: os.environ/INFERENCE_API_KEY
+litellm_settings:
+  callbacks:
+    - litellm_trace_headers.trace_headers

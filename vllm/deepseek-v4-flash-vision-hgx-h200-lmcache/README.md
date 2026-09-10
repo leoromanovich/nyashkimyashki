@@ -1,5 +1,27 @@
 # DeepSeek V4 Flash Vision · vLLM + LMCache · HGX 8×H200
 
+## Запуск и трассировка
+
+Состав: **vllm + SMG + Collector**.
+8×H200, DEP8, общий LMCache RAM/SSD. Параметры модели и cache budgets сохранены при переносе.
+
+```bash
+cp .env.example .env
+# Настройте пути, API keys и OTLP_UPSTREAM_ENDPOINT в .env.
+# Для экспериментов добавьте RESTART_POLICY=no.
+docker compose config --quiet
+docker compose up -d --build
+```
+
+Внешний клиент обращается к SMG на `http://<host>:30000/v1`; укажите одинаковый
+inference API key в `.env` и LiteLLM. Публичный bind по умолчанию — localhost;
+для доступа с другого сервера задайте `SMG_BIND=<LAN IP>`.
+Collector отправляет только очищенные traces в обязательный внешний OTLP/gRPC endpoint; TLS включён по умолчанию. OWUI, LiteLLM и Jaeger этим Compose не создаются.
+
+[Интеграция OWUI/LiteLLM, просмотр запроса и проверочный клиент](../../misc/telemetry/README.md).
+[Запуск через Nix](../../misc/telemetry/README.md#nix).
+
+
 Профиль для агентного кодинга: 200 пользователей × 2 сессии, контекст
 200000 токенов, 2 ТБ RAM, 17 ТБ SSD. **Кандидат для проверки на HGX**:
 Compose и source contracts проверяются локально; сборка CUDA-образа,
@@ -103,9 +125,9 @@ Namespace каталога включает model/image/LMCache revisions. Пр�
 
 ```bash
 export VLLM_DSV4_ENV_FILE=/etc/llm/deepseek-v4-vision-vllm.env
-./cc feature vllm-dsv4-vision-lmcache-h200 run nyashkimyashki-vllm-dsv4-lmcache-h200-control config
-./cc feature vllm-dsv4-vision-lmcache-h200 run nyashkimyashki-vllm-dsv4-lmcache-h200-control build-image
-./cc feature vllm-dsv4-vision-lmcache-h200 run nyashkimyashki-vllm-dsv4-lmcache-h200-control preflight
+./cc feature recipes-layout-tracing run nyashkimyashki-vllm-dsv4-lmcache-h200-control config
+./cc feature recipes-layout-tracing run nyashkimyashki-vllm-dsv4-lmcache-h200-control build-image
+./cc feature recipes-layout-tracing run nyashkimyashki-vllm-dsv4-lmcache-h200-control preflight
 ```
 
 Скопируйте `.env.example` во внешний env-файл, задайте API key, cache paths
@@ -118,8 +140,8 @@ H200, driver, RAM/SSD, установленные extensions, Vision/HMA/MM impo
 
 ```bash
 export VLLM_DSV4_CONFIRM=mutate-vllm-dsv4-h200
-./cc feature vllm-dsv4-vision-lmcache-h200 run nyashkimyashki-vllm-dsv4-lmcache-h200-control up
-./cc feature vllm-dsv4-vision-lmcache-h200 run nyashkimyashki-vllm-dsv4-lmcache-h200-control smoke
+./cc feature recipes-layout-tracing run nyashkimyashki-vllm-dsv4-lmcache-h200-control up
+./cc feature recipes-layout-tracing run nyashkimyashki-vllm-dsv4-lmcache-h200-control smoke
 ```
 
 `up` использует уже собранный image. `config` выводит результат проверки

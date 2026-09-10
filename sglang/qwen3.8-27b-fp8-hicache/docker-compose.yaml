@@ -1,0 +1,157 @@
+name: qwen38-sglang-smg
+services:
+  sglang:
+    build: &sglang-build
+      context: .
+      dockerfile: Dockerfile.sglang
+      args:
+        SGLANG_IMAGE: ${SGLANG_IMAGE:-lmsysorg/sglang:v0.5.19@sha256:d6e7288627be8b02be88e4bba38e73f6d50e2826869f753c13a4c4385ab3eda9}
+    image: &sglang-image ${SGLANG_RUNTIME_IMAGE:-local/qwen38-sglang:0.5.19-smg0.9.1-tracing1}
+    init: true
+    restart: ${RESTART_POLICY:-unless-stopped}
+    shm_size: 16gb
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GPU_ID:-0}"]
+              capabilities: [gpu]
+    environment:
+      ENABLE_TRACING: ${ENABLE_TRACING:-1}
+      OTLP_TRACES_ENDPOINT: ${OTLP_TRACES_ENDPOINT:-otel-collector:4317}
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      SGLANG_TRACE_LEVEL: ${SGLANG_TRACE_LEVEL:-1}
+      HF_HUB_OFFLINE: "1"
+      ENABLE_MTP: ${ENABLE_MTP:-1}
+      MTP_REPLAY_SSM: ${MTP_REPLAY_SSM:-1}
+      SGLANG_HICACHE_FILE_BACKEND_STORAGE_DIR: /hicache
+      SGLANG_HICACHE_FILE_BACKEND_MAX_SIZE: ${SSD_CACHE_SIZE:-48Gi}
+      SGLANG_HICACHE_FILE_BACKEND_MIN_FREE_SPACE: ${SSD_MIN_FREE:-20Gi}
+      SGLANG_HICACHE_FILE_BACKEND_EVICTION_RATIO: "0.9"
+    volumes:
+      - ${MODEL_DIR:-/data/scratch/qwen38-sglang-smg/models/Qwen3.8-27B-FP8}:/model:ro
+      - ${SSD_CACHE_DIR:-/data/scratch/qwen38-sglang-smg/hicache-fp8kv-bf16gdn-mtp}:/hicache
+      - ${RUNTIME_CACHE_DIR:-/data/scratch/qwen38-sglang-smg/runtime-cache}:/root/.cache
+    command: >-
+      bash /opt/qwen38/serve.sh
+      --model-path /model
+      --tokenizer-path /model
+      --served-model-name Qwen3.8-27B
+      --host 0.0.0.0
+      --port 19051
+      --smg-grpc-mode
+      --smg-http-sidecar-port 19052
+      --tp-size 1
+      --dp-size 1
+      --enable-dp-attention
+      --dtype bfloat16
+      --kv-cache-dtype ${KV_CACHE_DTYPE:-fp8_e4m3}
+      --context-length ${CONTEXT_LENGTH:-32768}
+      --mem-fraction-static ${MEM_FRACTION:-0.94}
+      --max-running-requests ${MAX_RUNNING_REQUESTS:-8}
+      --chunked-prefill-size ${CHUNKED_PREFILL_SIZE:-2048}
+      --page-size 64
+      --mamba-ssm-dtype ${MAMBA_SSM_DTYPE:-bfloat16}
+      --mamba-radix-cache-strategy extra_buffer_lazy
+      --mamba-full-memory-ratio ${MAMBA_MEMORY_RATIO:-1.1}
+      --max-mamba-cache-size ${MAX_MAMBA_CACHE_SIZE:-35}
+      --enable-hierarchical-cache
+      --hicache-size ${HOST_CACHE_GB:-64}
+      --hicache-write-policy write_through
+      --hicache-io-backend kernel
+      --hicache-mem-layout page_first
+      --hicache-storage-backend file
+      --hicache-storage-prefetch-policy wait_complete
+      --kv-events-config '{"publisher":"zmq","endpoint":"tcp://*:5557","topic":"kv-events"}'
+      --enable-metrics
+      --reasoning-parser qwen3
+      --tool-call-parser qwen3_coder
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import grpc,urllib.request; from grpc_health.v1 import health_pb2,health_pb2_grpc; s=health_pb2_grpc.HealthStub(grpc.insecure_channel('localhost:19051')); assert s.Check(health_pb2.HealthCheckRequest(),timeout=5).status == 1; assert urllib.request.urlopen('http://localhost:19052/metrics',timeout=2).status == 200"
+      interval: 15s
+      timeout: 8s
+      retries: 80
+      start_period: 120s
+  smg:
+    build:
+      context: .
+      dockerfile: Dockerfile.smg
+    image: ${SMG_RUNTIME_IMAGE:-local/qwen38-smg:1.10.1-tracing2}
+    init: true
+    restart: ${RESTART_POLICY:-unless-stopped}
+    depends_on:
+      sglang:
+        condition: service_healthy
+    environment:
+      ENABLE_TRACING: ${ENABLE_TRACING:-1}
+      OTLP_TRACES_ENDPOINT: ${OTLP_TRACES_ENDPOINT:-otel-collector:4317}
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      RUST_LOG: info,smg::policies::cache_aware=debug,smg::worker::kv_event_monitor=debug
+      HF_HUB_OFFLINE: "1"
+    volumes:
+      - ../../misc/telemetry/trace_probe.py:/opt/telemetry/trace_probe.py:ro
+      - ${MODEL_DIR:-/data/scratch/qwen38-sglang-smg/models/Qwen3.8-27B-FP8}:/model:ro
+    ports:
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-30000}:30000"
+      - "127.0.0.1:${METRICS_PORT:-29000}:29000"
+    command: >-
+      launch
+      --worker-urls grpc://sglang:19051
+      --model-path /model
+      --policy cache_aware
+      --load-monitor-interval 1
+      --dp-aware
+      --block-size 64
+      --max-tree-size ${SMG_FALLBACK_TREE_TOKENS:-131072}
+      --host 0.0.0.0
+      --port 30000
+      --prometheus-host 0.0.0.0
+      --prometheus-port 29000
+      --reasoning-parser qwen3
+      --tool-call-parser qwen_coder
+      --log-level info
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; r=urllib.request.urlopen('http://localhost:30000/readiness',timeout=4); assert r.status == 200"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+  download:
+    profiles: [tools]
+    build: *sglang-build
+    image: *sglang-image
+    restart: "no"
+    entrypoint: ["bash", "/opt/qwen38/download.sh"]
+    environment:
+      MODEL_DIR: /model
+      HF_HUB_DOWNLOAD_TIMEOUT: "120"
+    volumes:
+      - ${MODEL_DIR:-/data/scratch/qwen38-sglang-smg/models/Qwen3.8-27B-FP8}:/model
+  otel-collector:
+    extends:
+      file: ../../misc/telemetry/compose.services.yaml
+      service: otel-collector
+    environment:
+      OTLP_UPSTREAM_ENDPOINT: ${OTLP_UPSTREAM_ENDPOINT:-jaeger:4317}
+      OTLP_UPSTREAM_INSECURE: ${OTLP_UPSTREAM_INSECURE:-true}
+      TELEMETRY_ENVIRONMENT: ${TELEMETRY_ENVIRONMENT:-development}
+      TELEMETRY_RECIPE: qwen3.8-27b-fp8-hicache
+    ports:
+      - "${OTLP_BIND:-127.0.0.1}:${OTLP_GRPC_PORT:-4317}:4317"
+      - "${OTLP_BIND:-127.0.0.1}:${OTLP_HTTP_PORT:-4318}:4318"
+  jaeger:
+    extends:
+      file: ../../misc/telemetry/compose.services.yaml
+      service: jaeger

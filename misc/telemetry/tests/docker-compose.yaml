@@ -1,0 +1,72 @@
+name: recipes-tracing-test
+services:
+  otel-collector:
+    extends:
+      file: ../compose.services.yaml
+      service: otel-collector
+    restart: ${RESTART_POLICY:-unless-stopped}
+    environment:
+      OTLP_UPSTREAM_ENDPOINT: jaeger:4317
+      OTLP_UPSTREAM_INSECURE: "true"
+      TELEMETRY_ENVIRONMENT: test
+      TELEMETRY_RECIPE: synthetic
+    ports:
+      - "127.0.0.1:14328:4318"
+  jaeger:
+    extends:
+      file: ../compose.services.yaml
+      service: jaeger
+    restart: ${RESTART_POLICY:-unless-stopped}
+  mock-vllm:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    environment:
+      ENGINE: vllm
+    restart: ${RESTART_POLICY:-unless-stopped}
+  mock-sglang:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    environment:
+      ENGINE: sglang
+    restart: ${RESTART_POLICY:-unless-stopped}
+  smg:
+    extends:
+      file: ../compose.services.yaml
+      service: smg
+    restart: ${RESTART_POLICY:-unless-stopped}
+    ports:
+      - "127.0.0.1:33000:30000"
+    command: >-
+      --host 0.0.0.0
+      --port 30000
+      --worker-urls http://mock-vllm:8000
+      --backend vllm
+      --policy cache_aware
+      --api-key synthetic-fixture-key
+      --history-backend none
+      --enable-trace
+      --otlp-traces-endpoint otel-collector:4317
+      --health-check-endpoint /health
+      --worker-startup-timeout-secs 60
+  smg-sglang:
+    extends:
+      file: ../compose.services.yaml
+      service: smg
+    restart: ${RESTART_POLICY:-unless-stopped}
+    ports:
+      - "127.0.0.1:33002:30000"
+    command: >-
+      --host 0.0.0.0
+      --port 30000
+      --worker-urls http://mock-sglang:8000
+      --backend sglang
+      --dp-aware
+      --policy cache_aware
+      --api-key synthetic-fixture-key
+      --history-backend none
+      --enable-trace
+      --otlp-traces-endpoint otel-collector:4317
+      --health-check-endpoint /health
+      --worker-startup-timeout-secs 60

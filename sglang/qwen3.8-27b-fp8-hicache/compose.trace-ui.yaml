@@ -1,0 +1,7 @@
+# Compatibility overlay: the local viewer is included by default.
+services:
+  otel-collector:
+    environment:
+      OTLP_UPSTREAM_ENDPOINT: jaeger:4317
+      OTLP_UPSTREAM_INSECURE: "true"
+      OTLP_UPSTREAM_AUTHORIZATION: ""

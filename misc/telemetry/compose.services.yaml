@@ -1,0 +1,59 @@
+# Reused through Compose extends. Paths are resolved relative to this file.
+services:
+  smg:
+    image: local/recipe-smg:1.10.1
+    build:
+      context: .
+      dockerfile: Dockerfile.smg
+    platform: linux/amd64
+    volumes:
+      - ./trace_probe.py:/opt/telemetry/trace_probe.py:ro
+    init: true
+    restart: ${RESTART_POLICY:-unless-stopped}
+    mem_limit: 1g
+    stop_grace_period: 120s
+    environment:
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:30000/readiness',timeout=5)"]
+      interval: 15s
+      timeout: 8s
+      retries: 120
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: '3'
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.160.0@sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6
+    init: true
+    restart: ${RESTART_POLICY:-unless-stopped}
+    mem_limit: 512m
+    command: >-
+      --config=/etc/otelcol/config.yaml
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    environment:
+      OTLP_RECEIVER_HOST: 0.0.0.0
+      OTLP_RECEIVER_GRPC_PORT: '4317'
+      OTLP_RECEIVER_HTTP_PORT: '4318'
+      OTLP_UPSTREAM_AUTHORIZATION: ${OTLP_UPSTREAM_AUTHORIZATION:-}
+      TELEMETRY_ENVIRONMENT: ${TELEMETRY_ENVIRONMENT:-production}
+      TELEMETRY_RECIPE: ${TELEMETRY_RECIPE:-inference}
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+  jaeger:
+    image: jaegertracing/jaeger:2.20.0@sha256:46a886260e04002d8f45e213fc39063fa11a50446048fdaa64786fc0840cb9f8
+    init: true
+    restart: ${RESTART_POLICY:-unless-stopped}
+    mem_limit: 512m
+    volumes:
+      - ./jaeger.yaml:/etc/jaeger/config.yaml:ro
+    command: >-
+      --config=/etc/jaeger/config.yaml
+    ports:
+      - "127.0.0.1:${JAEGER_UI_PORT:-16686}:16686"

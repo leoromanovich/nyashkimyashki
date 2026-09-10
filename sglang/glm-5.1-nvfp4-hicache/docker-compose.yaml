@@ -1,26 +1,22 @@
-name: deepseek-v4-flash-vision-h200
+name: glm-5.1-nvfp4-hicache
 services:
   sglang:
-    image: local/deepseek-v4-flash-vision-hgx-h200:tracing
     platform: linux/amd64
+    image: local/glm-5.1-nvfp4-hicache:tracing
     restart: ${RESTART_POLICY:-unless-stopped}
-    stop_grace_period: 2m
+    stop_grace_period: 1m
     ipc: host
+    shm_size: 32gb
     cap_add:
     - SYS_NICE
     ports:
     - 127.0.0.1:${ENGINE_PORT:-30001}:30000
     environment:
-      HF_TOKEN: ${HF_TOKEN:-}
-      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-16}
       TRITON_CACHE_DIR: /cache/triton
       TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
-      SGLANG_DG_CACHE_DIR: /cache/deepgemm
-      SGLANG_DSV4_REASONING_EFFORT: high
-      SGLANG_HICACHE_FILE_BACKEND_STORAGE_DIR: /hicache
-      SGLANG_HICACHE_FILE_BACKEND_MAX_SIZE: ${HICACHE_MAX_SIZE:-10T}
-      SGLANG_HICACHE_FILE_BACKEND_MIN_FREE_SPACE: ${HICACHE_MIN_FREE_SPACE:-3T}
-      SGLANG_HICACHE_FILE_BACKEND_EVICTION_RATIO: '0.9'
+      SGLANG_DG_CACHE_DIR: /cache/dg
+      OMP_NUM_THREADS: '32'
+      SGLANG_ENABLE_SPEC_V2: '1'
       OTEL_TRACES_SAMPLER: parentbased_always_on
       OTEL_SERVICE_NAME: sglang
       OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: grpc
@@ -30,73 +26,78 @@ services:
       OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: 'false'
       SGLANG_TRACE_LEVEL: ${SGLANG_TRACE_LEVEL:-1}
     volumes:
-    - ${MODEL_CACHE_DIR:-/opt/models/huggingface}:/models
-    - ${HICACHE_DIR:-/opt/sglang/hicache/dsv4-vision-6821d6a-40b3e15-dpa8}:/hicache
-    - kernel-cache:/cache
+    - /opt/models:/models
+    - ./logs:/logs
+    - ./cache/torchinductor:/cache/torchinductor
+    - ./cache/triton:/cache/triton
+    - ./cache/dg:/cache/dg
+    - ./cache/filecache:/tmp/hicache
     ulimits:
       memlock: -1
       stack: 67108864
     command: >-
-      python3 -m sglang.launch_server
-      --model-path deepseek-ai/DeepSeek-V4-Flash-Vision-Exp
-      --revision 6821d6ad3681a4b137b066b76094fa82ebd0a380
-      --download-dir /models
-      --served-model-name deepseek-v4-flash-vision
+      python -m sglang.launch_server
+      --model-path /models/GLM-5.1-NVFP4
+      --quantization modelopt_fp4
+      --served-model-name glm
       --host 0.0.0.0
       --port 30000
-      --api-key '${SGLANG_API_KEY:?set SGLANG_API_KEY}'
       --admin-api-key '${SGLANG_ADMIN_API_KEY:?set SGLANG_ADMIN_API_KEY}'
+      --attention-backend nsa
+      --nsa-prefill-backend trtllm
+      --nsa-decode-backend trtllm
+      --moe-runner-backend flashinfer_trtllm
+      --enable-flashinfer-allreduce-fusion
+      --context-length 202752
+      --reasoning-parser glm45
+      --tool-call-parser glm47
       --trust-remote-code
-      --tp-size 8
-      --dp-size 8
-      --enable-dp-attention
-      --ep-size 1
-      --moe-a2a-backend none
-      --load-balance-method total_tokens
-      --moe-runner-backend flashinfer_mxfp4
-      --disable-shared-experts-fusion
-      --context-length 200000
-      --reasoning-parser deepseek-v4
-      --tool-call-parser deepseekv4
       --kv-cache-dtype fp8_e4m3
-      --page-size 256
-      --chunked-prefill-size '${CHUNKED_PREFILL_SIZE:-32768}'
-      --max-running-requests '${MAX_RUNNING_REQUESTS:-256}'
-      --max-queued-requests '${MAX_QUEUED_REQUESTS_PER_DP:-64}'
-      --cuda-graph-max-bs-decode '${CUDA_GRAPH_MAX_BS:-32}'
-      --schedule-policy fcfs
-      --mem-fraction-static '${MEM_FRACTION_STATIC:-0.85}'
       --enable-hierarchical-cache
-      --hicache-ratio '${HICACHE_RATIO:-1.25}'
-      --hicache-io-backend direct
-      --hicache-mem-layout page_first_direct
+      --hicache-io-backend kernel
+      --hicache-size 150
       --hicache-write-policy write_through_selective
-      --hicache-storage-backend file
-      --hicache-storage-prefetch-policy timeout
+      --page-size 64
+      --chunked-prefill-size 65536
+      --max-prefill-tokens 32768
+      --schedule-conservativeness 3.3333333333
+      --cuda-graph-max-bs 18
+      --max-running-requests 128
+      --tp 8
+      --dp 8
+      --enable-dp-attention
+      --enable-flashinfer-allreduce-fusion
+      --enable-dp-lm-head
+      --load-balance-method total_tokens
+      --schedule-policy lpm
+      --mem-fraction-static 0.85
       --enable-metrics
-      --enable-cache-report
+      --enable-custom-logit-processor
+      --speculative-algorithm EAGLE
+      --speculative-num-steps 3
+      --speculative-eagle-topk 1
+      --speculative-num-draft-tokens 4
+      --json-model-override-args '{"index_topk_pattern": "FFSFSSSFSSFFFSSSFFFSFSSSSSSFFSFFSFFSSFFFFFFSFFFFFSFFSSSSSSFSFFFSFSSSFSFFSFFSSS"}'
+      --model-loader-extra-config '{"enable_multithread_load":true,"num_threads":128}'
       --enable-trace
+      --api-key '${SGLANG_API_KEY:?set SGLANG_API_KEY}'
       --otlp-traces-endpoint otel-collector:4317
     deploy:
       resources:
         reservations:
           devices:
           - driver: nvidia
-            count: 8
+            count: all
             capabilities:
             - gpu
     healthcheck:
       test:
-      - CMD
-      - curl
-      - -fsS
-      - --max-time
-      - '20'
-      - http://127.0.0.1:30000/health
+      - CMD-SHELL
+      - curl -fsS http://127.0.0.1:30000/health || exit 1
       interval: 30s
-      timeout: 25s
+      timeout: 10s
       retries: 10
-      start_period: 30m
+      start_period: 180s
     logging:
       driver: json-file
       options:
@@ -106,7 +107,7 @@ services:
       context: ../../misc/telemetry
       dockerfile: Dockerfile.sglang
       args:
-        SGLANG_BASE_IMAGE: lmsysorg/sglang:dev-dsv4-flash-vision@sha256:44a113290011bf87fcfeabc2ed94966bfc90f91b2dbe6239a69de3f35e686cba
+        SGLANG_BASE_IMAGE: lmsysorg/sglang:v0.5.12.post1-cu130
     depends_on:
       otel-collector:
         condition: service_started
@@ -144,8 +145,6 @@ services:
     environment:
       OTLP_UPSTREAM_ENDPOINT: ${OTLP_UPSTREAM_ENDPOINT:?set external OTLP gRPC endpoint}
       OTLP_UPSTREAM_INSECURE: ${OTLP_UPSTREAM_INSECURE:-false}
-      TELEMETRY_RECIPE: deepseek-v4-flash-vision-hgx-h200
+      TELEMETRY_RECIPE: glm-5.1-nvfp4-hicache
       TELEMETRY_ENVIRONMENT: ${TELEMETRY_ENVIRONMENT:-production}
     restart: ${RESTART_POLICY:-unless-stopped}
-volumes:
-  kernel-cache: null

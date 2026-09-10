@@ -41,7 +41,7 @@ def preflight(config, args):
         minimum = 4_000_000_000_000 if mount["target"] == "/hicache" else 500_000_000_000
         if shutil.disk_usage(directory).free < minimum:
             raise RuntimeError("insufficient free space at " + str(directory))
-    info = json.loads(subprocess.check_output(["docker", "image", "inspect", IMAGE]))[0]
+    info = json.loads(subprocess.check_output(["docker", "image", "inspect", config["services"]["sglang"]["image"]]))[0]
     if info["Config"].get("Labels", {}).get("org.opencontainers.image.revision") != SOURCE_REVISION:
         raise RuntimeError("unexpected image source revision")
     print("OK: Compose, credentials, 8xH200, driver, RAM, storage and local image revision")
@@ -50,7 +50,7 @@ def preflight(config, args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["config", "preflight", "smoke", "pull", "up", "down", "stop", "restart", "logs", "ps"])
+    parser.add_argument("action", choices=["config", "preflight", "smoke", "pull", "build", "up", "down", "stop", "restart", "logs", "ps"])
     parser.add_argument("extra", nargs=argparse.REMAINDER)
     ns = parser.parse_args()
     env_file = Path(os.environ.get("DSV4_ENV_FILE", str(ROOT / ".env"))).resolve()
@@ -82,7 +82,7 @@ def main():
             raise RuntimeError("set DSV4_CONFIRM=mutate-dsv4-vision-h200 for runtime changes")
     if ns.action in ("up", "restart"):
         preflight(config, args)
-    extra = ns.extra or (["-d"] if ns.action == "up" else [])
+    extra = ns.extra or (["-d"] if ns.action == "up" else ["--ignore-buildable"] if ns.action == "pull" else [])
     subprocess.run(compose_args(ROOT, env_file) + [ns.action, *extra], check=True)
 
 

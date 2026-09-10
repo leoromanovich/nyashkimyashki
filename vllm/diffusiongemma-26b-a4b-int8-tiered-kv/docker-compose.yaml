@@ -1,0 +1,132 @@
+name: diffusion-gemma-vllm
+services:
+  diffusiongemma:
+    image: ${VLLM_IMAGE:?set VLLM_IMAGE}
+    container_name: diffusion-gemma-vllm
+    restart: ${RESTART_POLICY:-unless-stopped}
+    init: true
+    ipc: private
+    shm_size: ${VLLM_SHM_GIB:?set VLLM_SHM_GIB}gb
+    stop_grace_period: 120s
+    entrypoint:
+    - /opt/diffusiongemma/serve.sh
+    ports:
+    - ${VLLM_BIND_IP:-127.0.0.1}:${VLLM_PORT:-8000}:8000
+    environment:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      HF_HUB_OFFLINE: '1'
+      NVIDIA_VISIBLE_DEVICES: ${GPU_DEVICE_ID:-0}
+      PYTHONHASHSEED: '0'
+      TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
+      TRANSFORMERS_OFFLINE: '1'
+      VLLM_API_KEY: ${VLLM_API_KEY:?set VLLM_API_KEY}
+      VLLM_CACHE_ROOT: /cache/vllm
+      VLLM_ENABLE_CUDA_COMPATIBILITY: ${VLLM_ENABLE_CUDA_COMPATIBILITY:-1}
+      VLLM_USE_V2_MODEL_RUNNER: '1'
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      OTEL_SERVICE_NAME: vllm
+      OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: grpc
+      OTEL_BSP_MAX_QUEUE_SIZE: '2048'
+      OTEL_BSP_MAX_EXPORT_BATCH_SIZE: '256'
+      OTEL_BSP_SCHEDULE_DELAY: '1000'
+      OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: 'false'
+    volumes:
+    - ${MODEL_DIR:?set MODEL_DIR}:/models:ro
+    - ${VLLM_CACHE_DIR:?set VLLM_CACHE_DIR}:/cache
+    - ${KV_CACHE_DIR:?set KV_CACHE_DIR}:/kv-cache
+    - ./serve.sh:/opt/diffusiongemma/serve.sh:ro
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities:
+            - gpu
+    command: >-
+      --model /models
+      --served-model-name '${VLLM_SERVED_MODEL:-diffusiongemma}'
+      --host 0.0.0.0
+      --port 8000
+      --dtype bfloat16
+      --attention-backend TRITON_ATTN
+      --max-model-len '${MAX_MODEL_LEN:-65536}'
+      --max-num-seqs '${MAX_NUM_SEQS:-4}'
+      --max-num-batched-tokens '${MAX_NUM_BATCHED_TOKENS:-8192}'
+      --gpu-memory-utilization '${GPU_MEMORY_UTILIZATION:-0.85}'
+      --enable-prefix-caching
+      --enable-chunked-prefill
+      --kv-offloading-size '${KV_CPU_GIB:?set' 'KV_CPU_GIB}'
+      --kv-offloading-backend native
+      --kv-transfer-config '${KV_TRANSFER_CONFIG:?set KV_TRANSFER_CONFIG}'
+      --mm-processor-kwargs '{"max_soft_tokens":${MM_MAX_SOFT_TOKENS:-1120}}'
+      --limit-mm-per-prompt '{"image":1,"video":0}'
+      --mm-processor-cache-gb '${MM_PROCESSOR_CACHE_GB:-4}'
+      --hf-overrides '{"diffusion_sampler":"entropy_bound","diffusion_entropy_bound":0.1}'
+      --diffusion-config '{"canvas_length":256}'
+      --generation-config vllm
+      --reasoning-parser gemma4
+      --enable-request-id-headers
+      --disable-log-requests
+      --otlp-traces-endpoint otel-collector:4317
+    healthcheck:
+      test:
+      - CMD
+      - python3
+      - -c
+      - import os,urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/v1/models',headers={'Authorization':'Bearer '+os.environ['VLLM_API_KEY']}); urllib.request.urlopen(r,timeout=5).read()
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 30m
+    depends_on:
+      otel-collector:
+        condition: service_started
+  smg:
+    extends:
+      file: ../../misc/telemetry/compose.services.yaml
+      service: smg
+    command: >-
+      --host 0.0.0.0
+      --port 30000
+      --worker-urls 'http://${SMG_WORKER_SERVICE:-diffusiongemma}:8000'
+      --backend vllm
+      --policy cache_aware
+      --api-key '${VLLM_API_KEY:?set VLLM_API_KEY}'
+      --history-backend none
+      --enable-trace
+      --otlp-traces-endpoint otel-collector:4317
+      --prometheus-host 0.0.0.0
+      --prometheus-port 29000
+      --health-check-endpoint /health
+      --worker-startup-timeout-secs 1800
+      --request-timeout-secs 1800
+    depends_on:
+      otel-collector:
+        condition: service_started
+    ports:
+    - ${SMG_BIND:-127.0.0.1}:${SMG_PORT:-30000}:30000
+    - 127.0.0.1:${SMG_METRICS_PORT:-29000}:29000
+    restart: ${RESTART_POLICY:-unless-stopped}
+  jaeger:
+    extends:
+      file: ../../misc/telemetry/compose.services.yaml
+      service: jaeger
+    restart: ${RESTART_POLICY:-unless-stopped}
+  otel-collector:
+    extends:
+      file: ../../misc/telemetry/compose.services.yaml
+      service: otel-collector
+    environment:
+      OTLP_UPSTREAM_ENDPOINT: ${OTLP_UPSTREAM_ENDPOINT:-jaeger:4317}
+      OTLP_UPSTREAM_INSECURE: ${OTLP_UPSTREAM_INSECURE:-true}
+      TELEMETRY_RECIPE: diffusiongemma-26b-a4b-int8-tiered-kv
+      TELEMETRY_ENVIRONMENT: ${TELEMETRY_ENVIRONMENT:-development}
+    ports:
+    - 127.0.0.1:${OTLP_GRPC_PORT:-4317}:4317
+    - 127.0.0.1:${OTLP_HTTP_PORT:-4318}:4318
+    restart: ${RESTART_POLICY:-unless-stopped}

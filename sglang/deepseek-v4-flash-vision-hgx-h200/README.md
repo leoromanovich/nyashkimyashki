@@ -1,5 +1,28 @@
 # DeepSeek V4 Flash Vision — HGX 8×H200
 
+## Запуск и трассировка
+
+Состав: **sglang + SMG + Collector**.
+8×H200, DPA8/TP8, SSD HiCache. Параметры модели и cache budgets сохранены при переносе.
+
+```bash
+cp .env.example .env
+# Настройте пути, API keys и OTLP_UPSTREAM_ENDPOINT в .env.
+# Для экспериментов добавьте RESTART_POLICY=no.
+docker compose config --quiet
+docker compose build sglang smg
+docker compose up -d --build
+```
+
+Внешний клиент обращается к SMG на `http://<host>:30000/v1`; укажите одинаковый
+inference API key в `.env` и LiteLLM. Публичный bind по умолчанию — localhost;
+для доступа с другого сервера задайте `SMG_BIND=<LAN IP>`.
+Collector отправляет только очищенные traces в обязательный внешний OTLP/gRPC endpoint; TLS включён по умолчанию. OWUI, LiteLLM и Jaeger этим Compose не создаются.
+
+[Интеграция OWUI/LiteLLM, просмотр запроса и проверочный клиент](../../misc/telemetry/README.md).
+[Запуск через Nix](../../misc/telemetry/README.md#nix).
+
+
 DPA throughput-профиль для **200 пользователей × 2 сессии**, контекста **200000**,
 **2 ТБ RAM / 17 ТБ SSD**. Source/Compose проверены 2026-09-09. GPU smoke,
 восстановление Vision KV из RAM/SSD и нагрузочный прогон на HGX ещё требуются.
@@ -102,7 +125,7 @@ Nix app: `nyashkimyashki-sglang-dsv4-vision-h200-control`.
 В локальной разработке source выбирается feature override:
 
 ```bash
-./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control config
+./cc feature recipes-layout-tracing run nyashkimyashki-sglang-dsv4-vision-h200-control config
 ```
 
 Скопировать `.env.example` во внешний env-файл, задать два разных ключа,
@@ -115,15 +138,15 @@ chunk 32768, graph 32, `MAX_QUEUED_REQUESTS_PER_DP=64`, новый cache namespa
 
 ```bash
 export DSV4_ENV_FILE=/absolute/path/dsv4-vision.env
-./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control config
+./cc feature recipes-layout-tracing run nyashkimyashki-sglang-dsv4-vision-h200-control config
 
 # Явное разрешение runtime side effects на целевом HGX.
 export DSV4_CONFIRM=mutate-dsv4-vision-h200
-./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control pull
-./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control preflight
-./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control up -d
-./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control logs --tail 100 -f
-./cc feature sglang-dsv4-h200-dpa-throughput run nyashkimyashki-sglang-dsv4-vision-h200-control smoke
+./cc feature recipes-layout-tracing run nyashkimyashki-sglang-dsv4-vision-h200-control pull
+./cc feature recipes-layout-tracing run nyashkimyashki-sglang-dsv4-vision-h200-control preflight
+./cc feature recipes-layout-tracing run nyashkimyashki-sglang-dsv4-vision-h200-control up -d
+./cc feature recipes-layout-tracing run nyashkimyashki-sglang-dsv4-vision-h200-control logs --tail 100 -f
+./cc feature recipes-layout-tracing run nyashkimyashki-sglang-dsv4-vision-h200-control smoke
 ```
 
 Первый запуск скачивает pinned checkpoint в `/models` при доступе к Hugging Face.
