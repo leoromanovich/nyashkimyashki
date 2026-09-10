@@ -1,0 +1,8 @@
+# Export Qwen traces to shared infrastructure; Jaeger is not started.
+services:
+  jaeger:
+    profiles: [local-viewer]
+  otel-collector:
+    environment:
+      OTLP_UPSTREAM_ENDPOINT: ${OTLP_UPSTREAM_ENDPOINT:?set external OTLP gRPC endpoint}
+      OTLP_UPSTREAM_INSECURE: ${OTLP_UPSTREAM_INSECURE:-false}

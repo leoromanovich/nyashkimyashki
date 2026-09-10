@@ -1,0 +1,8 @@
+# Compatibility overlay: tracing is enabled in docker-compose.yaml by default.
+services:
+  sglang:
+    environment:
+      ENABLE_TRACING: "1"
+  smg:
+    environment:
+      ENABLE_TRACING: "1"

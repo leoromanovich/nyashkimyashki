@@ -1,0 +1,5 @@
+ARG SGLANG_BASE_IMAGE
+FROM ${SGLANG_BASE_IMAGE}
+# SGLang makes tracing an optional dependency. Install it at build time.
+RUN python3 -m pip install --no-cache-dir opentelemetry-api==1.37.0 opentelemetry-sdk==1.37.0 opentelemetry-exporter-otlp==1.37.0 \
+    && python3 -c 'from sglang.srt.observability.trace import opentelemetry_imported; assert opentelemetry_imported'

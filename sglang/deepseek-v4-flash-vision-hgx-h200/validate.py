@@ -52,7 +52,7 @@ def validate(directory, env_file):
     assert all(line.startswith("      --") and "\\" not in line for line in lines[1:])
     config = resolve(directory, env_file)
     service = config["services"]["sglang"]
-    assert service["image"] == IMAGE and service["platform"] == "linux/amd64"
+    assert service["build"]["args"]["SGLANG_BASE_IMAGE"] == IMAGE and service["platform"] == "linux/amd64"
     args = options(service["command"])
     required = {
         "--model-path": "deepseek-ai/DeepSeek-V4-Flash-Vision-Exp", "--revision": REVISION,

@@ -37,7 +37,7 @@ def validate(root=ROOT, env_file=None):
     env_file = env_file or root / ".env.example"
     raw = (root / "docker-compose.yaml").read_text()
     blocks = re.findall(r"^    command: >-\n((?:      .*\n)+)", raw, re.M)
-    assert len(blocks) == 2, "both commands must use folded scalars"
+    assert len(blocks) == 3, "engine, cache and SMG commands must use folded scalars"
     for block in blocks:
         assert all(line.startswith("      --") and "\\" not in line
                    for line in block.splitlines()[1:])
@@ -45,11 +45,11 @@ def validate(root=ROOT, env_file=None):
     subprocess.run(command + ["config", "--quiet"], check=True)
     config = json.loads(subprocess.check_output(command + ["config", "--format", "json"]))
     services = config["services"]
-    assert set(services) == {"vllm", "lmcache"}
+    assert set(services) == {"vllm", "lmcache", "smg", "otel-collector"}
     versions = json.loads((root / "versions.json").read_text())
     assert (root / "Dockerfile").read_text().startswith("FROM " + versions["base_image"] + "\n")
     assert services["vllm"]["image"] == services["lmcache"]["image"]
-    for service in services.values():
+    for service in (services["vllm"], services["lmcache"]):
         assert service["network_mode"] == "host" and service["ipc"] == "host"
         assert service["platform"] == "linux/amd64"
         assert service["deploy"]["resources"]["reservations"]["devices"][0]["count"] == 8

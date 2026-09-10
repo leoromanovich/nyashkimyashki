@@ -1,0 +1,139 @@
+[
+  {
+    "path": "sglang/deepseek-v4-flash-vision-hgx-h200",
+    "engine": "sglang",
+    "mode": "external",
+    "services": [
+      "sglang"
+    ],
+    "host_network": false
+  },
+  {
+    "path": "sglang/glm-5.1-nvfp4-hicache",
+    "engine": "sglang",
+    "mode": "external",
+    "services": [
+      "sglang"
+    ],
+    "host_network": false
+  },
+  {
+    "path": "sglang/glm-5.1-nvfp4-mooncake-b200",
+    "engine": "sglang",
+    "mode": "external",
+    "services": [
+      "sglang"
+    ],
+    "host_network": false
+  },
+  {
+    "path": "sglang/glm-5.1-nvfp4-mooncake-host",
+    "engine": "sglang",
+    "mode": "external",
+    "services": [
+      "sglang"
+    ],
+    "host_network": true
+  },
+  {
+    "path": "sglang/glm-5.1-nvfp4-mooncake-separate",
+    "engine": "sglang",
+    "mode": "external",
+    "services": [
+      "sglang"
+    ],
+    "host_network": false
+  },
+  {
+    "path": "sglang/glm-5.1-nvfp4-mooncake-separate-small",
+    "engine": "sglang",
+    "mode": "external",
+    "services": [
+      "sglang"
+    ],
+    "host_network": false
+  },
+  {
+    "path": "sglang/glm-5.1-nvfp4-smg",
+    "engine": "sglang",
+    "mode": "external",
+    "services": [
+      "sglang"
+    ],
+    "host_network": false
+  },
+  {
+    "path": "sglang/kimi-k2.6-eagle3-hicache",
+    "engine": "sglang",
+    "mode": "external",
+    "services": [
+      "sglang"
+    ],
+    "host_network": false
+  },
+  {
+    "path": "sglang/qwen3-8b-dpa",
+    "engine": "sglang",
+    "mode": "local",
+    "services": [
+      "sglang"
+    ],
+    "host_network": false
+  },
+  {
+    "path": "vllm/deepseek-v4-flash-vision-hgx-h200-lmcache",
+    "engine": "vllm",
+    "mode": "external",
+    "services": [
+      "vllm"
+    ],
+    "host_network": true
+  },
+  {
+    "path": "vllm/diffusiongemma-26b-a4b-int8-tiered-kv",
+    "engine": "vllm",
+    "mode": "local",
+    "services": [
+      "diffusiongemma"
+    ],
+    "host_network": false
+  },
+  {
+    "path": "vllm/gemma4-26b-a4b-tiered-kv",
+    "engine": "vllm",
+    "mode": "local",
+    "services": [
+      "gemma4",
+      "gemma4-mtp"
+    ],
+    "host_network": false
+  },
+  {
+    "path": "vllm/kimi-k2.6-dep8-eagle3",
+    "engine": "vllm",
+    "mode": "external",
+    "services": [
+      "vllm-kimi-k26"
+    ],
+    "host_network": true
+  },
+  {
+    "path": "vllm/kimi-k2.6-tp8",
+    "engine": "vllm",
+    "mode": "external",
+    "services": [
+      "vllm"
+    ],
+    "host_network": false
+  },
+  {
+    "path": "sglang/qwen3.8-27b-fp8-hicache",
+    "engine": "sglang",
+    "mode": "local",
+    "services": [
+      "sglang"
+    ],
+    "host_network": false,
+    "transport": "grpc"
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "qwen38-sglang-smg": "sglang/qwen3.8-27b-fp8-hicache",
+  "gemma4_a4b_vllm": "vllm/gemma4-26b-a4b-tiered-kv",
+  "diffusion_gemma_vllm": "vllm/diffusiongemma-26b-a4b-int8-tiered-kv",
+  "sticky-sessions": "misc/sticky-sessions",
+  "current_glm.yaml": "sglang/glm-5.1-nvfp4-hicache/docker-compose.yaml",
+  "gateway_ecample.yaml": "sglang/glm-5.1-nvfp4-smg/docker-compose.yaml",
+  "compose_mooncacke_b200.yaml": "sglang/glm-5.1-nvfp4-mooncake-b200/docker-compose.yaml",
+  "mooncacke_compose.yaml": "sglang/glm-5.1-nvfp4-mooncake-host/docker-compose.yaml",
+  "mooncake_separate_services.yaml": [
+    "sglang/glm-5.1-nvfp4-mooncake-separate-small/docker-compose.yaml",
+    "sglang/glm-5.1-nvfp4-mooncake-separate/docker-compose.yaml"
+  ],
+  "kimi_vllm.yaml": "vllm/kimi-k2.6-dep8-eagle3/docker-compose.yaml",
+  "tmp_sticky.yaml": "sglang/qwen3-8b-dpa/docker-compose.yaml",
+  "prefix_cache_load.py": "misc/prefix-cache-load/prefix_cache_load.py",
+  "owui_filter.txt": "misc/openwebui-filter/owui_filter.txt",
+  "gemma_a100.txt": "misc/notes/gemma_a100.txt",
+  "gemma_problem.md": "misc/notes/gemma_problem.md",
+  "building_pipeline_plan.md": "misc/notes/building_pipeline_plan.md",
+  "docker-compose.md": "misc/notes/docker-compose.md",
+  "models_implementation_plan.md": "misc/notes/models_implementation_plan.md",
+  "nvfp4notes.md": "misc/notes/nvfp4notes.md",
+  "tmp_perms.txt": "misc/notes/tmp_perms.txt",
+  "nvfp4_sglang.txt": "misc/notes/nvfp4_sglang.txt",
+  "control_center.md": "misc/notes/control_center.md",
+  "kimi_docker_compose.yaml": [
+    "sglang/kimi-k2.6-eagle3-hicache/docker-compose.yaml",
+    "vllm/kimi-k2.6-tp8/docker-compose.yaml"
+  ]
+}

@@ -1,0 +1,64 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: ${env:OTLP_RECEIVER_HOST}:${env:OTLP_RECEIVER_GRPC_PORT}
+      http:
+        endpoint: ${env:OTLP_RECEIVER_HOST}:${env:OTLP_RECEIVER_HTTP_PORT}
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 384
+    spike_limit_mib: 64
+  filter/probes:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["uri"] == "/readiness"'
+        - 'attributes["uri"] == "/health"'
+        - 'attributes["uri"] == "/metrics"'
+  transform/metadata_only:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - 'keep_keys(attributes, ["method", "status_code", "latency", "request_id", "request.id", "rid", "module", "model", "mode", "request_type", "rpc.system", "http.request.method", "http.response.status_code", "http.route", "http.method", "http.status_code", "gen_ai.operation.name", "gen_ai.request.model", "gen_ai.response.model", "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens", "gen_ai.usage.prompt_tokens", "gen_ai.usage.completion_tokens", "gen_ai.request.id", "gen_ai.request.max_tokens", "gen_ai.request.temperature", "gen_ai.request.top_p", "gen_ai.request.n", "gen_ai.latency.time_to_first_token", "gen_ai.latency.e2e", "gen_ai.latency.time_in_queue", "gen_ai.latency.time_in_model_prefill", "gen_ai.latency.time_in_model_decode", "gen_ai.latency.time_in_model_inference", "error.type", "tp_rank", "dp_rank", "pp_rank", "thread_label", "host_id", "pid", "probe.mode"])'
+      - context: spanevent
+        statements:
+          - 'keep_keys(attributes, ["error.type", "exception.type"])'
+          - 'set(name, "event")'
+      - context: span
+        statements:
+          - 'set(status.message, "")'
+          - 'replace_pattern(name, "[?].*", "")'
+      - context: resource
+        statements:
+          - 'keep_keys(attributes, ["service.name", "service.version", "service.instance.id", "telemetry.sdk.name", "telemetry.sdk.language", "telemetry.sdk.version", "vllm.instrumenting_module_name", "vllm.process_id", "vllm.process_kind", "vllm.process_name"])'
+  resource:
+    attributes:
+      - key: deployment.environment.name
+        value: ${env:TELEMETRY_ENVIRONMENT}
+        action: upsert
+      - key: inference.recipe
+        value: ${env:TELEMETRY_RECIPE}
+        action: upsert
+  batch:
+    timeout: 1s
+    send_batch_size: 256
+exporters:
+  otlp_grpc:
+    endpoint: ${env:OTLP_UPSTREAM_ENDPOINT}
+    headers:
+      authorization: ${env:OTLP_UPSTREAM_AUTHORIZATION}
+    tls:
+      insecure: ${env:OTLP_UPSTREAM_INSECURE}
+    sending_queue:
+      queue_size: 256
+    retry_on_failure:
+      max_elapsed_time: 60s
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/probes, transform/metadata_only, resource, batch]
+      exporters: [otlp_grpc]

@@ -1,0 +1,219 @@
+name: glm-5.1-nvfp4-mooncake-separate
+services:
+  mooncake-master:
+    image: lmsysorg/sglang:v0.5.12.post1-cu130
+    restart: ${RESTART_POLICY:-unless-stopped}
+    ipc: host
+    shm_size: 128gb
+    cap_add:
+    - SYS_NICE
+    - IPC_LOCK
+    security_opt:
+    - seccomp:unconfined
+    environment:
+      TZ: Europe/Moscow
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      stack: 67108864
+    networks:
+      mooncake-internal:
+        ipv4_address: 172.29.0.2
+    ports:
+    - 127.0.0.1:9003:9003
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: '5'
+    command: >-
+      mooncake_master
+      --rpc_port=50051
+      --metrics_port=9003
+      --enable_http_metadata_server=true
+      --http_metadata_server_port=8080
+      --enable_offload=true
+      --eviction_high_watermark_ratio=0.90
+      --logtostderr=true
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - python3 -c "import socket; s=socket.create_connection(('127.0.0.1',50051),2); s.close()"
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
+  mooncake-store:
+    image: lmsysorg/sglang:v0.5.12.post1-cu130
+    restart: ${RESTART_POLICY:-unless-stopped}
+    ipc: host
+    shm_size: 128gb
+    cap_add:
+    - SYS_NICE
+    - IPC_LOCK
+    security_opt:
+    - seccomp:unconfined
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      stack: 67108864
+    depends_on:
+      mooncake-master:
+        condition: service_healthy
+    networks:
+      mooncake-internal:
+        ipv4_address: 172.29.0.3
+    environment:
+      TZ: Europe/Moscow
+      MOONCAKE_GLOBAL_SEGMENT_SIZE: 128gb
+      MOONCAKE_PROTOCOL: tcp
+      MOONCAKE_DEVICE: ''
+      MOONCAKE_THREADS: '16'
+      MOONCAKE_OFFLOAD_GB: '6000'
+      MOONCAKE_OFFLOAD_FILE_STORAGE_PATH: /mooncake_cache
+      MOONCAKE_OFFLOAD_STORAGE_BACKEND_DESCRIPTOR: bucket_storage_backend
+      MOONCAKE_OFFLOAD_BUCKET_EVICTION_POLICY: lru
+      MOONCAKE_OFFLOAD_USE_URING: '1'
+    volumes:
+    - /home/cache/mooncake_cache:/mooncake_cache
+    - ./mooncake-store-entrypoint.sh:/opt/recipe/mooncake-store-entrypoint.sh:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: '5'
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - python3 -c "import socket; s=socket.create_connection(('172.29.0.3',50052),2); s.close()"
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+    entrypoint:
+    - bash
+    - /opt/recipe/mooncake-store-entrypoint.sh
+  sglang:
+    platform: linux/amd64
+    image: local/glm-5.1-nvfp4-mooncake-separate:tracing
+    restart: ${RESTART_POLICY:-unless-stopped}
+    stop_grace_period: 1m
+    ipc: host
+    shm_size: 64gb
+    cap_add:
+    - SYS_NICE
+    - IPC_LOCK
+    security_opt:
+    - seccomp:unconfined
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      stack: 67108864
+    depends_on:
+      mooncake-store:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    networks:
+      mooncake-internal:
+        ipv4_address: 172.29.0.4
+    ports:
+    - 127.0.0.1:${ENGINE_PORT:-30001}:30000
+    gpus: all
+    environment:
+      TZ: Europe/Moscow
+      TRITON_CACHE_DIR: /cache/triton
+      TORCHINDUCTOR_CACHE_DIR: /cache/torchinductor
+      SGLANG_DG_CACHE_DIR: /cache/dg
+      OMP_NUM_THREADS: '32'
+      SGLANG_ENABLE_SPEC_V2: '1'
+      MC_STORE_MEMCPY: '1'
+      SGLANG_ADMIN_API_KEY: ${SGLANG_ADMIN_API_KEY:?set SGLANG_ADMIN_API_KEY}
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      OTEL_SERVICE_NAME: sglang
+      OTEL_EXPORTER_OTLP_TRACES_PROTOCOL: grpc
+      OTEL_BSP_MAX_QUEUE_SIZE: '2048'
+      OTEL_BSP_MAX_EXPORT_BATCH_SIZE: '256'
+      OTEL_BSP_SCHEDULE_DELAY: '1000'
+      OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: 'false'
+      SGLANG_TRACE_LEVEL: ${SGLANG_TRACE_LEVEL:-1}
+      OTLP_TRACES_ENDPOINT: otel-collector:4317
+      SGLANG_API_KEY: ${SGLANG_API_KEY:?set SGLANG_API_KEY}
+    volumes:
+    - /opt/models:/models
+    - ./logs:/logs
+    - ./cache/torchinductor:/cache/torchinductor
+    - ./cache/triton:/cache/triton
+    - ./cache/dg:/cache/dg
+    - ./sglang-entrypoint.sh:/opt/recipe/sglang-entrypoint.sh:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: '5'
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://127.0.0.1:30000/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 240s
+    entrypoint:
+    - bash
+    - /opt/recipe/sglang-entrypoint.sh
+    build:
+      context: ../../misc/telemetry
+      dockerfile: Dockerfile.sglang
+      args:
+        SGLANG_BASE_IMAGE: lmsysorg/sglang:v0.5.12.post1-cu130
+  smg:
+    extends:
+      file: ../../misc/telemetry/compose.services.yaml
+      service: smg
+    command: >-
+      --host 0.0.0.0
+      --port 30000
+      --worker-urls 'http://${SMG_WORKER_SERVICE:-sglang}:30000'
+      --backend sglang
+      --dp-aware
+      --policy cache_aware
+      --api-key '${SGLANG_API_KEY:?set SGLANG_API_KEY}'
+      --history-backend none
+      --enable-trace
+      --otlp-traces-endpoint otel-collector:4317
+      --prometheus-host 0.0.0.0
+      --prometheus-port 29000
+      --health-check-endpoint /health
+      --worker-startup-timeout-secs 1800
+      --request-timeout-secs 1800
+    depends_on:
+      otel-collector:
+        condition: service_started
+    ports:
+    - ${SMG_BIND:-127.0.0.1}:${SMG_PORT:-30000}:30000
+    - 127.0.0.1:${SMG_METRICS_PORT:-29000}:29000
+    networks:
+    - mooncake-internal
+    restart: ${RESTART_POLICY:-unless-stopped}
+  otel-collector:
+    extends:
+      file: ../../misc/telemetry/compose.services.yaml
+      service: otel-collector
+    environment:
+      OTLP_UPSTREAM_ENDPOINT: ${OTLP_UPSTREAM_ENDPOINT:?set external OTLP gRPC endpoint}
+      OTLP_UPSTREAM_INSECURE: ${OTLP_UPSTREAM_INSECURE:-false}
+      TELEMETRY_RECIPE: glm-5.1-nvfp4-mooncake-separate
+      TELEMETRY_ENVIRONMENT: ${TELEMETRY_ENVIRONMENT:-production}
+    networks:
+    - mooncake-internal
+    restart: ${RESTART_POLICY:-unless-stopped}
+networks:
+  mooncake-internal:
+    driver: bridge
+    ipam:
+      config:
+      - subnet: 172.29.0.0/24

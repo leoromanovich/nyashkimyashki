@@ -1,0 +1,4 @@
+FROM python:3.12-slim
+RUN pip install --no-cache-dir opentelemetry-sdk==1.37.0 opentelemetry-exporter-otlp==1.37.0
+COPY mock_engine.py /mock_engine.py
+ENTRYPOINT ["python", "/mock_engine.py"]
