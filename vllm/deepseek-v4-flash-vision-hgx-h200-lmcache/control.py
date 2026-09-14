@@ -11,6 +11,23 @@ import sys
 from validate import ROOT, compose_args, validate
 
 
+def check_storage(config):
+    for name, service in config["services"].items():
+        for mount in service.get("volumes", []):
+            if mount["type"] != "bind":
+                continue
+            path = Path(mount["source"])
+            if name not in {"vllm", "lmcache"}:
+                if not path.exists():
+                    raise RuntimeError("missing service bind source: " + str(path))
+                continue
+            if not path.is_dir():
+                raise RuntimeError("create configured directory: " + str(path))
+            reserve = 3_000_000_000_000 if name == "lmcache" else 500_000_000_000
+            if shutil.disk_usage(path).free < reserve:
+                raise RuntimeError("insufficient free storage: " + str(path))
+
+
 def preflight(config, v, l, command):
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         raise RuntimeError("requires the Linux x86_64 HGX host")
@@ -30,16 +47,7 @@ def preflight(config, v, l, command):
     required = cache_budget + 400_000_000_000
     if available < required:
         raise RuntimeError("RAM must cover the shared LMCache budget plus 400 GB headroom")
-    for name, service in config["services"].items():
-        for mount in service.get("volumes", []):
-            if mount["type"] != "bind":
-                continue
-            path = Path(mount["source"])
-            if not path.is_dir():
-                raise RuntimeError("create configured directory: " + str(path))
-            reserve = 3_000_000_000_000 if name == "lmcache" else 500_000_000_000
-            if shutil.disk_usage(path).free < reserve:
-                raise RuntimeError("insufficient free storage: " + str(path))
+    check_storage(config)
     image = config["services"]["vllm"]["image"]
     subprocess.run(["docker", "run", "--rm", "--gpus", "all", "--network", "none",
                     "--entrypoint", "python3", image, "/opt/recipe/image_check.py"], check=True)
@@ -56,7 +64,7 @@ def preflight(config, v, l, command):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["config", "build-image", "preflight", "smoke", "up", "down", "stop", "restart", "logs", "ps"])
+    parser.add_argument("action", choices=["config", "build-image", "preflight", "smoke", "acceptance", "up", "down", "stop", "restart", "logs", "ps"])
     parser.add_argument("extra", nargs=argparse.REMAINDER)
     ns = parser.parse_args()
     env_file = Path(os.environ.get("VLLM_DSV4_ENV_FILE", str(ROOT / ".env"))).resolve()
@@ -65,7 +73,10 @@ def main():
     config, v, l = validate(env_file=env_file)
     command = compose_args(ROOT, env_file)
     if ns.action == "config":
-        print("OK: credentials omitted; DEP8, context 200000; max sequences:", 8 * int(v["--max-num-seqs"]))
+        print(f"OK: credentials omitted; DEP8, context {v['--max-model-len']}; "
+              f"sequence ceiling {8 * int(v['--max-num-seqs'])}; "
+              f"shared RAM {l['--l1-size-gb']} GiB, "
+              f"SSD {json.loads(l['--l2-adapter'])['backend_params']['max_capacity_gb']} GiB")
         return
     if ns.action == "build-image":
         subprocess.run(command + ["build", "vllm", *ns.extra], check=True)
@@ -73,13 +84,13 @@ def main():
     if ns.action == "preflight":
         preflight(config, v, l, command)
         return
-    if ns.action == "smoke":
+    if ns.action in {"smoke", "acceptance"}:
         address = v["--host"]
         if address in {"0.0.0.0", "::"}:
             address = "127.0.0.1"
         env = dict(os.environ, VLLM_API_KEY=config["services"]["vllm"]["environment"]["VLLM_API_KEY"])
         env.setdefault("VLLM_DSV4_BASE_URL", f"http://{address}:{v['--port']}/v1")
-        subprocess.run([sys.executable, str(ROOT / "smoke.py"), *ns.extra], env=env, check=True)
+        subprocess.run([sys.executable, str(ROOT / f"{ns.action}.py"), *ns.extra], env=env, check=True)
         return
     if ns.action in {"up", "down", "stop", "restart"}:
         if os.environ.get("VLLM_DSV4_CONFIRM") != "mutate-vllm-dsv4-h200":
