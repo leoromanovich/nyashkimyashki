@@ -59,8 +59,9 @@ def validate(root=ROOT, env_file=None):
         "--revision": versions["model_revision"], "--api-server-count": "1",
         "--tensor-parallel-size": "1", "--data-parallel-size": "8",
         "--enable-expert-parallel": True, "--moe-backend": "marlin",
-        "--max-model-len": "200000", "--kv-cache-dtype": "fp8_ds_mla", "--block-size": "256",
+        "--max-model-len": "400000", "--kv-cache-dtype": "fp8_ds_mla", "--block-size": "256",
         "--enable-prefix-caching": True, "--enable-chunked-prefill": True,
+        "--no-disable-hybrid-kv-cache-manager": True,
         "--disable-chunked-mm-input": True, "--tokenizer-mode": "deepseek_v4",
         "--reasoning-parser": "deepseek_v4", "--tool-call-parser": "deepseek_v4",
         "--enable-auto-tool-choice": True,
@@ -99,6 +100,13 @@ def validate(root=ROOT, env_file=None):
     assert 1 <= float(l2["backend_params"]["max_capacity_gb"]) <= 8192
     assert l2["eviction"] == {"eviction_policy": "LRU", "trigger_watermark": 0.85, "eviction_ratio": 0.1}
     assert services["vllm"]["environment"]["VLLM_API_KEY"]
+    # Inspect the real argv for the inherited gateway command too.
+    gateway = parse_options(services["smg"]["command"], [])
+    assert gateway["--backend"] == "vllm" and gateway["--policy"] == "cache_aware"
+    assert gateway["--worker-urls"] == f"http://127.0.0.1:{v['--port']}"
+    assert gateway["--history-backend"] == "none"
+    assert all(s["restart"] in {"unless-stopped", "no"} for s in services.values())
+    assert len({s["restart"] for s in services.values()}) == 1
     for script in root.glob("*.py"):
         ast.parse(script.read_text(), filename=str(script))
     return config, v, l

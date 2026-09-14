@@ -1,17 +1,11 @@
 # DeepSeek V4 Flash Vision · vLLM + LMCache · HGX 8×H200
 
-## Запуск и трассировка
+Throughput-профиль для кодинговых ассистентов и чата: **8×H200, 400000 total
+tokens, 2 ТБ RAM, 17 ТБ SSD**. Состав: vLLM + общий LMCache + SMG + Collector.
+Лимиты рассчитаны на несколько сотен сессий с очередью и паузами инструментов.
+Фактическая активная ёмкость и SLA требуют нагрузочного прогона на HGX.
 
-Состав: **vllm + SMG + Collector**.
-8×H200, DEP8, общий LMCache RAM/SSD. Параметры модели и cache budgets сохранены при переносе.
-
-```bash
-cp .env.example .env
-# Настройте пути, API keys и OTLP_UPSTREAM_ENDPOINT в .env.
-# Для экспериментов добавьте RESTART_POLICY=no.
-docker compose config --quiet
-docker compose up -d --build
-```
+## API и трассировка
 
 Внешний клиент обращается к SMG на `http://<host>:30000/v1`; укажите одинаковый
 inference API key в `.env` и LiteLLM. Публичный bind по умолчанию — localhost;
@@ -22,10 +16,8 @@ Collector отправляет только очищенные traces в обя�
 [Запуск через Nix](../../misc/telemetry/README.md#nix).
 
 
-Профиль для агентного кодинга: 200 пользователей × 2 сессии, контекст
-200000 токенов, 2 ТБ RAM, 17 ТБ SSD. **Кандидат для проверки на HGX**:
-Compose и source contracts проверяются локально; сборка CUDA-образа,
-Vision + LMCache restore и производительность требуют GPU-прогона.
+**Кандидат для проверки на HGX**: Compose, argv и probes проверяются локально;
+сборка CUDA-образа, Vision + LMCache restore и производительность требуют GPU.
 
 ## Параметры
 
@@ -36,13 +28,14 @@ Vision + LMCache restore и производительность требуют 
 | Hopper MoE | `marlin`, исходные MXFP4 experts |
 | All-to-all | `allgather_reducescatter`; DeepEP high throughput — отдельный A/B |
 | KV | `fp8_ds_mla`, block 256, native hybrid KV manager |
-| Контекст | 200000: input + image tokens + output |
+| Контекст | 400000: template + input + image tokens + reasoning + answer |
+| Клиентский budget | до 384000 входных токенов + 16000 на reasoning/answer |
 | Scheduler | 32 seqs/rank, 8192 batched tokens/rank, chunked prefill |
 | Admission | 512 незавершённых запросов всего при одном API process |
 | HBM | `gpu-memory-utilization=0.88` |
 | LMCache | один общий MP server, 1024 GiB RAM + 8192 GiB SSD |
 | Prefix locality | GPU prefix cache + общий RAM/SSD cache между DP ranks |
-| API | `127.0.0.1:30001/v1`, ключ через внешний env-файл |
+| API | SMG `127.0.0.1:30000/v1`; engine `127.0.0.1:30001/v1` |
 | Images | до 8 на запрос; video отключено |
 | Speculation | выключена до проверки cache restore и throughput |
 
@@ -88,6 +81,8 @@ serving host. В base image есть nvcc; wheel LMCache с чужой torch ABI
 V4 хранит несколько compressed/SWA/state KV groups. Используется внешний
 `lmcache.integration.vllm.lmcache_mp_connector.LMCacheMPConnector` с
 `SupportsHMA`, сохранением native NHD layout и image-aware cache keys.
+`--no-disable-hybrid-kv-cache-manager` явно включает native hybrid manager;
+совместимость флага и connector проверяется по фактическому образу.
 `--separate-object-groups` разделяет группы при хранении и восстановлении.
 Обычный offload shorthand не выражает этот контракт.
 
@@ -125,14 +120,16 @@ Namespace каталога включает model/image/LMCache revisions. Пр�
 
 ```bash
 export VLLM_DSV4_ENV_FILE=/etc/llm/deepseek-v4-vision-vllm.env
-./cc feature recipes-layout-tracing run nyashkimyashki-vllm-dsv4-lmcache-h200-control config
-./cc feature recipes-layout-tracing run nyashkimyashki-vllm-dsv4-lmcache-h200-control build-image
-./cc feature recipes-layout-tracing run nyashkimyashki-vllm-dsv4-lmcache-h200-control preflight
+./cc feature vllm-dsv4-vision-h200-400k run nyashkimyashki-vllm-dsv4-lmcache-h200-control config
+./cc feature vllm-dsv4-vision-h200-400k run nyashkimyashki-vllm-dsv4-lmcache-h200-control build-image
+./cc feature vllm-dsv4-vision-h200-400k run nyashkimyashki-vllm-dsv4-lmcache-h200-control preflight
 ```
 
 Скопируйте `.env.example` во внешний env-файл, задайте API key, cache paths
 и создайте каталоги. Включите Nix features `nix-command flakes`, если
-они отключены. Сборка не запускает serving. Preflight проверяет восемь
+они отключены. Для экспериментов добавьте `RESTART_POLICY=no` во внешний
+env-файл; штатная политика Compose — `unless-stopped`.
+Сборка не запускает serving. Preflight проверяет восемь
 H200, driver, RAM/SSD, установленные extensions, Vision/HMA/MM imports
 и **каждый CLI-флаг по фактическому образу**.
 
@@ -140,23 +137,25 @@ H200, driver, RAM/SSD, установленные extensions, Vision/HMA/MM impo
 
 ```bash
 export VLLM_DSV4_CONFIRM=mutate-vllm-dsv4-h200
-./cc feature recipes-layout-tracing run nyashkimyashki-vllm-dsv4-lmcache-h200-control up
-./cc feature recipes-layout-tracing run nyashkimyashki-vllm-dsv4-lmcache-h200-control smoke
+./cc feature vllm-dsv4-vision-h200-400k run nyashkimyashki-vllm-dsv4-lmcache-h200-control up
+./cc feature vllm-dsv4-vision-h200-400k run nyashkimyashki-vllm-dsv4-lmcache-h200-control smoke
 ```
 
 `up` использует уже собранный image. `config` выводит результат проверки
 без секретов. Доступны `logs`, `ps`, `stop`, `down`, `restart`.
 При restart LMCache перезапускайте также vLLM, чтобы обновить CUDA IPC
 handles. `down` сохраняет model/cache volumes. Порт 30001 отделён от
-SGLang 30000; оба восьми-GPU сервиса одновременно на HGX запускать нельзя.
+SGLang engine 30000. SMG использует 30000; при смене стека освободите этот
+порт. Оба восьми-GPU сервиса одновременно на HGX запускать нельзя.
 
 ## Проверка перед нагрузкой
 
 1. Проверьте `nvidia-smi topo -m`, model load, Marlin/DEP8, hybrid KV groups
    и регистрацию всех восьми workers в LMCache. Запишите фактический
    GPU KV budget, число блоков и model/image versions.
-2. `smoke` проверяет text, SSE, tool round trip и red/blue/red images
-   на ranks 0/1/7. Длинный синтетический prefix пересекает LMCache chunks.
+2. `smoke` проверяет text, SSE, два последовательных tool round trips
+   с `tool_choice=auto` в JSON и SSE, затем red/blue/red images на ranks
+   0/1/7. Повторный вызов содержит историю предыдущих tools/results.
 3. Проверьте эквивалентность результатов при первом запросе, повторе и переносе
    на другой rank. Подтвердите store/load/hit по LMCache metrics/logs.
    Корректный повторный ответ сам по себе не доказывает offload.
@@ -164,8 +163,8 @@ SGLang 30000; оба восьми-GPU сервиса одновременно н
    перезапустите только vLLM и повторите запрос. Для SSD restore дождитесь
    завершения L2 store, остановите оба сервиса, запустите их с тем же
    namespace и повторите запрос. Подтвердите чтение L2 после очистки RAM.
-5. Повторите text/tools/images на 32k, 128k и около 200k total tokens.
-   Input budget для клиента: до 184000 с output reserve 16000, с учётом
+5. Повторите text/tools/images на 32k, 128k и около 400k total tokens.
+   Input budget для клиента: до 384000 с output reserve 16000, с учётом
    template/image tokens. Long-context correctness проверяется отдельно.
 6. Сравните cold, GPU-hot, RAM-hit и SSD-hit под 32/64/128/256 активными
    запросами, затем 400 сессиями с реальными паузами инструментов.
@@ -175,7 +174,7 @@ SGLang 30000; оба восьми-GPU сервиса одновременно н
 Для первого canary: `MAX_NUM_SEQS=8`, `CUDA_GRAPH_MAX_BS=8`, batch 4096.
 Далее seqs 16 → 32 → 64 и batch 4096 → 8192 → 16384 по TTFT/TPOT
 и preemptions. Рост seqs без доступного KV может ухудшить latency.
-200k задаёт максимальную длину одного запроса; 400 полностью заполненных
+400k задаёт максимальную длину одного запроса; 400 полностью заполненных
 контекстов одновременно нельзя обещать без измерений.
 
 `ALL2ALL_BACKEND=deepep_high_throughput` — A/B после базовой correctness,
@@ -188,6 +187,47 @@ SGLang 30000; оба восьми-GPU сервиса одновременно н
 identity internal queue-aware balancer выбирает rank сам; общий LMCache
 сохраняет возможность reuse между ranks. Следите за hot-rank imbalance.
 
+### Синтетическая проверка длинного контекста и offload
+
+На инстансе без другой нагрузки:
+
+```bash
+./cc feature vllm-dsv4-vision-h200-400k run nyashkimyashki-vllm-dsv4-lmcache-h200-control acceptance --run-id canary-20260914-01 --prompt-tokens 384000 --stage warm
+```
+
+`/tokenize` считает полный chat template. Скрипт подбирает вход в пределах
+128 токенов от заданного budget, резервирует 16000 output tokens и проверяет
+маркеры в начале, середине и конце. Затем повторяет тот же запрос на ranks
+0/0/1/7. Новый `run-id` создаёт новый prefix; сохраняйте его при restore.
+Для ступеней 32k/128k total задайте `--prompt-tokens 16000` / `112000`.
+
+Stdout содержит только JSON с correctness, prompt/completion counts, client
+TTFT, elapsed и дельтами агрегированных LMCache counters. Его можно сохранить
+в файл метрик. Prompt, ответы, tool payloads и metric labels не сохраняются.
+Скрипт обращается прямо к engine; для отдельного smoke через SMG задайте
+`VLLM_DSV4_BASE_URL=http://127.0.0.1:30000/v1`.
+
+После `warm` дождитесь завершения L1/L2 stores по `/metrics` и нулевого
+`lmcache_mp_num_inflight_l2_stores`. Для проверки RAM перезапустите только
+vLLM, дождитесь его health и выполните:
+
+```bash
+./cc feature vllm-dsv4-vision-h200-400k run nyashkimyashki-vllm-dsv4-lmcache-h200-control acceptance --run-id canary-20260914-01 --prompt-tokens 384000 --stage ram-restore
+```
+
+Для SSD остановите пару vLLM/LMCache, запустите её с тем же SSD namespace
+и выполните `acceptance` с теми же `run-id`/budget и `--stage ssd-restore`.
+Runtime-действия выполняются оператором через `stop` / `up` / `restart`;
+probe сервисы не перезапускает. Например, `restart vllm` очищает GPU cache,
+`stop vllm lmcache` останавливает пару; после `up` дождитесь `/health`.
+
+RAM-прогон требует прироста `lmcache_mp_num_chunks_loaded_total`;
+SSD-прогон дополнительно требует `lmcache_mp_l2_load_completed_requests_total`.
+Счётчики completed GPU transfers сами по себе не доказывают успешную загрузку.
+Иная нагрузка мешает атрибуции: эти проверки требуют выделенного инстанса.
+Качество tools/images на длинном контексте и конкурентный throughput
+проверяются отдельно; три маркера дают ограниченную проверку text correctness.
+
 ## Источники
 
 - [Официальный Vision recipe](https://recipes.vllm.ai/deepseek-ai/DeepSeek-V4-Flash-Vision-Exp).
@@ -198,4 +238,5 @@ identity internal queue-aware balancer выбирает rank сам; общий 
 - [MP connector](https://github.com/LMCache/LMCache/blob/21a5db10f1fc280fc7a5d59ce2660697669a0e1d/lmcache/integration/vllm/lmcache_mp_connector.py).
 - [Dynamic NIXL L2](https://github.com/LMCache/LMCache/blob/21a5db10f1fc280fc7a5d59ce2660697669a0e1d/lmcache/v1/distributed/l2_adapters/nixl_store_dynamic_l2_adapter.py).
 
-Source review: 2026-09-08; полные revisions и base digest в `versions.json`.
+400k profile/source review: 2026-09-14; исходные pins от 2026-09-08 сохранены
+в `versions.json`. Текущая GPU-квалификация не заявляется.
